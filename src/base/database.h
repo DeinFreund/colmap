@@ -41,6 +41,7 @@
 #include "SQLite/sqlite3.h"
 #include "base/camera.h"
 #include "base/image.h"
+#include "base/line.h"
 #include "estimators/two_view_geometry.h"
 #include "feature/types.h"
 #include "util/types.h"
@@ -77,6 +78,7 @@ class Database {
   bool ExistsImage(const image_t image_id) const;
   bool ExistsImageWithName(std::string name) const;
   bool ExistsKeypoints(const image_t image_id) const;
+  bool ExistsLineSegments(const image_t image_id) const;
   bool ExistsDescriptors(const image_t image_id) const;
   bool ExistsMatches(const image_t image_id1, const image_t image_id2) const;
   bool ExistsInlierMatches(const image_t image_id1,
@@ -147,6 +149,7 @@ class Database {
   std::vector<Image> ReadAllImages() const;
 
   FeatureKeypoints ReadKeypoints(const image_t image_id) const;
+  std::vector<LineSegment> ReadLineSegments(const image_t image_id) const;
   FeatureDescriptors ReadDescriptors(const image_t image_id) const;
 
   FeatureMatches ReadMatches(const image_t image_id1,
@@ -179,6 +182,8 @@ class Database {
   // `image_id1` and `image_id2` does not matter.
   void WriteKeypoints(const image_t image_id,
                       const FeatureKeypoints& keypoints) const;
+  void WriteLineSegments(const image_t image_id,
+                         const std::vector<LineSegment>& line_segments) const;
   void WriteDescriptors(const image_t image_id,
                         const FeatureDescriptors& descriptors) const;
   void WriteMatches(const image_t image_id1, const image_t image_id2,
@@ -247,6 +252,7 @@ class Database {
   void CreateCameraTable() const;
   void CreateImageTable() const;
   void CreateKeypointsTable() const;
+  void CreateLineSegmentsTable() const;
   void CreateDescriptorsTable() const;
   void CreateMatchesTable() const;
   void CreateTwoViewGeometriesTable() const;
@@ -291,6 +297,7 @@ class Database {
   sqlite3_stmt* sql_stmt_exists_image_id_ = nullptr;
   sqlite3_stmt* sql_stmt_exists_image_name_ = nullptr;
   sqlite3_stmt* sql_stmt_exists_keypoints_ = nullptr;
+  sqlite3_stmt* sql_stmt_exists_line_segments_ = nullptr;
   sqlite3_stmt* sql_stmt_exists_descriptors_ = nullptr;
   sqlite3_stmt* sql_stmt_exists_matches_ = nullptr;
   sqlite3_stmt* sql_stmt_exists_two_view_geometry_ = nullptr;
@@ -310,6 +317,7 @@ class Database {
   sqlite3_stmt* sql_stmt_read_image_name_ = nullptr;
   sqlite3_stmt* sql_stmt_read_images_ = nullptr;
   sqlite3_stmt* sql_stmt_read_keypoints_ = nullptr;
+  sqlite3_stmt* sql_stmt_read_line_segments_ = nullptr;
   sqlite3_stmt* sql_stmt_read_descriptors_ = nullptr;
   sqlite3_stmt* sql_stmt_read_matches_ = nullptr;
   sqlite3_stmt* sql_stmt_read_matches_all_ = nullptr;
@@ -319,6 +327,7 @@ class Database {
 
   // write_*
   sqlite3_stmt* sql_stmt_write_keypoints_ = nullptr;
+  sqlite3_stmt* sql_stmt_write_line_segments_ = nullptr;
   sqlite3_stmt* sql_stmt_write_descriptors_ = nullptr;
   sqlite3_stmt* sql_stmt_write_matches_ = nullptr;
   sqlite3_stmt* sql_stmt_write_two_view_geometry_ = nullptr;

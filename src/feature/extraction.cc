@@ -37,6 +37,11 @@
 #include "feature/sift.h"
 #include "util/cuda.h"
 #include "util/misc.h"
+#include "base/line.h"
+
+extern "C" {
+#include "LSD/lsd.h"
+}
 
 namespace colmap {
 namespace {
@@ -400,19 +405,25 @@ void SiftFeatureExtractorThread::Run() {
                                            &image_data.keypoints,
                                            &image_data.descriptors);
         }
+
+        if (sift_options_.extract_lines) {
+          image_data.lines = DetectLineSegments(
+              image_data.bitmap, sift_options_.min_line_length_px);
+        }
+        
         if (success) {
-          ScaleKeypoints(image_data.bitmap, image_data.camera,
-                         &image_data.keypoints);
-          if (camera_mask_) {
-            MaskKeypoints(*camera_mask_, &image_data.keypoints,
-                          &image_data.descriptors);
-          }
-          if (image_data.mask.Data()) {
-            MaskKeypoints(image_data.mask, &image_data.keypoints,
-                          &image_data.descriptors);
-          }
+            ScaleKeypoints(image_data.bitmap, image_data.camera,
+                           &image_data.keypoints);
+            if (camera_mask_) {
+                MaskKeypoints(*camera_mask_, &image_data.keypoints,
+                              &image_data.descriptors);
+            }
+            if (image_data.mask.Data()) {
+                MaskKeypoints(image_data.mask, &image_data.keypoints,
+                              &image_data.descriptors);
+            }
         } else {
-          image_data.status = ImageReader::Status::FAILURE;
+            image_data.status = ImageReader::Status::FAILURE;
         }
       }
 
@@ -502,6 +513,11 @@ void FeatureWriterThread::Run() {
       std::cout << StringPrintf("  Features:        %d",
                                 image_data.keypoints.size())
                 << std::endl;
+      if (!image_data.lines.empty()) {
+        std::cout << StringPrintf("  Line Segments:   %d",
+                                  image_data.lines.size())
+                  << std::endl;
+      }
 
       DatabaseTransaction database_transaction(database_);
 
@@ -512,6 +528,11 @@ void FeatureWriterThread::Run() {
       if (!database_->ExistsKeypoints(image_data.image.ImageId())) {
         database_->WriteKeypoints(image_data.image.ImageId(),
                                   image_data.keypoints);
+      }
+
+      if (!database_->ExistsLineSegments(image_data.image.ImageId())) {
+        database_->WriteLineSegments(image_data.image.ImageId(),
+                                     image_data.lines);
       }
 
       if (!database_->ExistsDescriptors(image_data.image.ImageId())) {

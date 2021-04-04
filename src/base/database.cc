@@ -44,6 +44,8 @@ typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
     FeatureKeypointsBlob;
 typedef Eigen::Matrix<uint8_t, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
     FeatureDescriptorsBlob;
+typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+    FeatureLineSegmentsBlob;
 typedef Eigen::Matrix<point2D_t, Eigen::Dynamic, 2, Eigen::RowMajor>
     FeatureMatchesBlob;
 
@@ -85,6 +87,32 @@ FeatureKeypoints FeatureKeypointsFromBlob(const FeatureKeypointsBlob& blob) {
     LOG(FATAL) << "Keypoint format not supported";
   }
   return keypoints;
+}
+
+FeatureLineSegmentsBlob FeatureLineSegmentsToBlob(
+    const std::vector<LineSegment>& lines) {
+  const FeatureLineSegmentsBlob::Index kNumCols = 4;
+  FeatureLineSegmentsBlob blob(lines.size(), kNumCols);
+  for (size_t i = 0; i < lines.size(); ++i) {
+    blob(i, 0) = lines[i].start.x();
+    blob(i, 1) = lines[i].start.y();
+    blob(i, 2) = lines[i].end.x();
+    blob(i, 3) = lines[i].end.y();
+  }
+  return blob;
+}
+
+std::vector<LineSegment> FeatureLineSegmentsFromBlob(
+    const FeatureLineSegmentsBlob& blob) {
+  std::vector<LineSegment> line_segs(static_cast<size_t>(blob.rows()));
+  if (blob.cols() == 4) {
+    for (FeatureLineSegmentsBlob::Index i = 0; i < blob.rows(); ++i) {
+        line_segs[i] = LineSegment {.start = {blob(i, 0), blob(i, 1)}, .end = {blob(i, 2), blob(i, 3)}};
+    }
+  } else {
+    LOG(FATAL) << "Line segment format not supported";
+  }
+  return line_segs;
 }
 
 FeatureMatchesBlob FeatureMatchesToBlob(const FeatureMatches& matches) {
@@ -308,6 +336,10 @@ bool Database::ExistsKeypoints(const image_t image_id) const {
   return ExistsRowId(sql_stmt_exists_keypoints_, image_id);
 }
 
+bool Database::ExistsLineSegments(const image_t image_id) const {
+  return ExistsRowId(sql_stmt_exists_line_segments_, image_id);
+}
+
 bool Database::ExistsDescriptors(const image_t image_id) const {
   return ExistsRowId(sql_stmt_exists_descriptors_, image_id);
 }
@@ -443,6 +475,18 @@ FeatureKeypoints Database::ReadKeypoints(const image_t image_id) const {
   SQLITE3_CALL(sqlite3_reset(sql_stmt_read_keypoints_));
 
   return FeatureKeypointsFromBlob(blob);
+}
+
+std::vector<LineSegment> Database::ReadLineSegments(const image_t image_id) const {
+  SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_read_line_segments_, 1, image_id));
+
+  const int rc = SQLITE3_CALL(sqlite3_step(sql_stmt_read_line_segments_));
+  const FeatureLineSegmentsBlob blob = ReadDynamicMatrixBlob<FeatureLineSegmentsBlob>(
+      sql_stmt_read_line_segments_, rc, 0);
+
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_read_line_segments_));
+
+  return FeatureLineSegmentsFromBlob(blob);
 }
 
 FeatureDescriptors Database::ReadDescriptors(const image_t image_id) const {
@@ -671,6 +715,17 @@ void Database::WriteKeypoints(const image_t image_id,
 
   SQLITE3_CALL(sqlite3_step(sql_stmt_write_keypoints_));
   SQLITE3_CALL(sqlite3_reset(sql_stmt_write_keypoints_));
+}
+
+void Database::WriteLineSegments(
+    const image_t image_id, const std::vector<LineSegment>& line_segments) const {
+  const FeatureLineSegmentsBlob blob = FeatureLineSegmentsToBlob(line_segments);
+
+  SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_write_line_segments_, 1, image_id));
+  WriteDynamicMatrixBlob(sql_stmt_write_line_segments_, blob, 2);
+
+  SQLITE3_CALL(sqlite3_step(sql_stmt_write_line_segments_));
+  SQLITE3_CALL(sqlite3_reset(sql_stmt_write_line_segments_));
 }
 
 void Database::WriteDescriptors(const image_t image_id,
@@ -1018,6 +1073,11 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_exists_keypoints_, 0));
   sql_stmts_.push_back(sql_stmt_exists_keypoints_);
+  
+  sql = "SELECT 1 FROM line_segments WHERE image_id = ?;";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_exists_line_segments_, 0));
+  sql_stmts_.push_back(sql_stmt_exists_line_segments_);
 
   sql = "SELECT 1 FROM descriptors WHERE image_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
@@ -1103,6 +1163,11 @@ void Database::PrepareSQLStatements() {
                                   &sql_stmt_read_keypoints_, 0));
   sql_stmts_.push_back(sql_stmt_read_keypoints_);
 
+  sql = "SELECT rows, cols, data FROM line_segments WHERE image_id = ?;";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_read_line_segments_, 0));
+  sql_stmts_.push_back(sql_stmt_read_line_segments_);
+  
   sql = "SELECT rows, cols, data FROM descriptors WHERE image_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_read_descriptors_, 0));
@@ -1143,6 +1208,11 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_write_keypoints_, 0));
   sql_stmts_.push_back(sql_stmt_write_keypoints_);
+
+  sql = "INSERT INTO line_segments(image_id, rows, cols, data) VALUES(?, ?, ?, ?);";
+  SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
+                                  &sql_stmt_write_line_segments_, 0));
+  sql_stmts_.push_back(sql_stmt_write_line_segments_);
 
   sql =
       "INSERT INTO descriptors(image_id, rows, cols, data) VALUES(?, ?, ?, ?);";
@@ -1219,6 +1289,7 @@ void Database::CreateTables() const {
   CreateCameraTable();
   CreateImageTable();
   CreateKeypointsTable();
+  CreateLineSegmentsTable();
   CreateDescriptorsTable();
   CreateMatchesTable();
   CreateTwoViewGeometriesTable();
@@ -1261,6 +1332,18 @@ void Database::CreateImageTable() const {
 void Database::CreateKeypointsTable() const {
   const std::string sql =
       "CREATE TABLE IF NOT EXISTS keypoints"
+      "   (image_id  INTEGER  PRIMARY KEY  NOT NULL,"
+      "    rows      INTEGER               NOT NULL,"
+      "    cols      INTEGER               NOT NULL,"
+      "    data      BLOB,"
+      "FOREIGN KEY(image_id) REFERENCES images(image_id) ON DELETE CASCADE);";
+
+  SQLITE3_EXEC(database_, sql.c_str(), nullptr);
+}
+
+void Database::CreateLineSegmentsTable() const {
+  const std::string sql =
+      "CREATE TABLE IF NOT EXISTS line_segments"
       "   (image_id  INTEGER  PRIMARY KEY  NOT NULL,"
       "    rows      INTEGER               NOT NULL,"
       "    cols      INTEGER               NOT NULL,"

@@ -285,6 +285,10 @@ void OptionManager::AddExtractionOptions() {
                               &sift_extraction->dsp_max_scale);
   AddAndRegisterDefaultOption("SiftExtraction.dsp_num_scales",
                               &sift_extraction->dsp_num_scales);
+  AddAndRegisterDefaultOption("SiftExtraction.extract_lines",
+                              &sift_extraction->extract_lines);
+  AddAndRegisterDefaultOption("SiftExtraction.min_line_length_px",
+                              &sift_extraction->min_line_length_px);
 }
 
 void OptionManager::AddMatchingOptions() {

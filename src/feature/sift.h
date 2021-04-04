@@ -110,6 +110,10 @@ struct SiftExtractionOptions {
   };
   Normalization normalization = Normalization::L1_ROOT;
 
+  bool extract_lines = false;
+
+  double min_line_length_px = 30;
+
   bool Check() const;
 };
 
