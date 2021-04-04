@@ -166,7 +166,7 @@ FeatureImageViewerWidget::FeatureImageViewerWidget(
 
 void FeatureImageViewerWidget::ReadAndShowWithKeypoints(
     const std::string& path, const FeatureKeypoints& keypoints,
-    const std::vector<char>& tri_mask) {
+    const std::vector<LineSegment>& lines, const std::vector<char>& tri_mask) {
   Bitmap bitmap;
   if (!bitmap.Read(path, true)) {
     std::cerr << "ERROR: Cannot read image at path " << path << std::endl;
@@ -194,6 +194,7 @@ void FeatureImageViewerWidget::ReadAndShowWithKeypoints(
 
   DrawKeypoints(&image2_, keypoints_tri, Qt::magenta);
   DrawKeypoints(&image2_, keypoints_not_tri, Qt::red);
+  DrawLineSegments(&image2_, lines, Qt::red);
 
   if (switch_state_) {
     ShowPixmap(image2_);

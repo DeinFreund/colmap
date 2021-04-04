@@ -46,6 +46,8 @@ COLMAP_ADD_SOURCES(
     image.h image.cc
     image_reader.h image_reader.cc
     line.h line.cc
+    line2d.h line2d.cc
+    line3d.h line3d.cc
     point2d.h point2d.cc
     point3d.h point3d.cc
     polynomial.h polynomial.cc

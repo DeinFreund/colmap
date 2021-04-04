@@ -236,6 +236,9 @@ class Image {
   // All image points, including points that are not part of a 3D point track.
   std::vector<class Point2D> points2D_;
 
+    // All image line segments
+    std::vector<LineSegment> line_segments_;
+    
   // Per image point, the number of correspondences that have a 3D point.
   std::vector<image_t> num_correspondences_have_point3D_;
 

@@ -106,6 +106,28 @@ void DrawKeypoints(QPixmap* pixmap, const FeatureKeypoints& points,
   }
 }
 
+void DrawLineSegments(QPixmap* pixmap, const std::vector<LineSegment>& lines,
+                      const QColor& color) {
+  if (pixmap->isNull()) {
+    return;
+  }
+
+  const int pen_width = 3 * (std::max(pixmap->width(), pixmap->height()) / 2048 + 1);
+
+  QPainter painter(pixmap);
+  painter.setRenderHint(QPainter::Antialiasing);
+
+  QPen pen;
+  pen.setWidth(pen_width);
+  pen.setColor(color);
+  painter.setPen(pen);
+
+  for (const auto& line : lines) {
+    painter.drawLine(line.start.x(), line.start.y(), line.end.x(),
+                     line.end.y());
+  }
+}
+
 QPixmap DrawMatches(const QPixmap& image1, const QPixmap& image2,
                     const FeatureKeypoints& points1,
                     const FeatureKeypoints& points2,
