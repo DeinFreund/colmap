@@ -112,7 +112,7 @@ void DrawLineSegments(QPixmap* pixmap, const std::vector<LineSegment>& lines,
     return;
   }
 
-  const int pen_width = 3 * (std::max(pixmap->width(), pixmap->height()) / 2048 + 1);
+  const int pen_width = 1 * (std::max(pixmap->width(), pixmap->height()) / 2048 + 1);
 
   QPainter painter(pixmap);
   painter.setRenderHint(QPainter::Antialiasing);

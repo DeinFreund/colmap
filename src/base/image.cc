@@ -67,6 +67,19 @@ void Image::TearDown() {
   point3D_visibility_pyramid_ = VisibilityPyramid(0, 0, 0);
 }
 
+void Image::SetLines2D(const std::vector<LineSegment>& lines) {
+  CHECK(lines2D_.empty());
+  lines2D_.resize(lines.size());
+  for (line2D_t line2D_idx = 0; line2D_idx < lines.size(); ++line2D_idx) {
+    lines2D_[line2D_idx].SetXY(lines[line2D_idx].start, lines[line2D_idx].end);
+  }
+}
+
+void Image::SetLines2D(const std::vector<class Line2D>& lines) {
+  CHECK(lines2D_.empty());
+  lines2D_ = lines;
+}
+
 void Image::SetPoints2D(const std::vector<Eigen::Vector2d>& points) {
   CHECK(points2D_.empty());
   points2D_.resize(points.size());

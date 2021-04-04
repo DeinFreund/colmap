@@ -37,6 +37,7 @@
 #include <QtCore>
 #include <QtOpenGL>
 
+#include "base/line.h"
 #include "feature/types.h"
 #include "util/bitmap.h"
 #include "util/types.h"

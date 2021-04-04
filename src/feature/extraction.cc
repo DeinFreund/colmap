@@ -58,6 +58,21 @@ void ScaleKeypoints(const Bitmap& bitmap, const Camera& camera,
   }
 }
 
+void ScaleLines(const Bitmap& bitmap, const Camera& camera,
+                std::vector<LineSegment>* lines) {
+  if (static_cast<size_t>(bitmap.Width()) != camera.Width() ||
+      static_cast<size_t>(bitmap.Height()) != camera.Height()) {
+    const float scale_x = static_cast<float>(camera.Width()) / bitmap.Width();
+    const float scale_y = static_cast<float>(camera.Height()) / bitmap.Height();
+    for (auto& line : *lines) {
+      line.start.x() *= scale_x;
+      line.end.x() *= scale_x;
+      line.start.y() *= scale_y;
+      line.end.y() *= scale_y;
+    }
+  }
+}
+
 void MaskKeypoints(const Bitmap& mask, FeatureKeypoints* keypoints,
                    FeatureDescriptors* descriptors) {
   size_t out_index = 0;
@@ -409,8 +424,9 @@ void SiftFeatureExtractorThread::Run() {
         if (sift_options_.extract_lines) {
           image_data.lines = DetectLineSegments(
               image_data.bitmap, sift_options_.min_line_length_px);
+          ScaleLines(image_data.bitmap, image_data.camera, &image_data.lines);
         }
-        
+
         if (success) {
             ScaleKeypoints(image_data.bitmap, image_data.camera,
                            &image_data.keypoints);

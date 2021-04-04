@@ -87,6 +87,9 @@ typedef uint64_t image_pair_t;
 // Index per image, i.e. determines maximum number of 2D points per image.
 typedef uint32_t point2D_t;
 
+// Index per image, i.e. determines maximum number of 2D line segments per image.
+typedef uint32_t line2D_t;
+
 // Unique identifier per added 3D point. Since we add many 3D points,
 // delete them, and possibly re-add them again, the maximum number of allowed
 // unique indices should be large.

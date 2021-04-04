@@ -377,9 +377,14 @@ void DatabaseImageViewerWidget::ShowImageWithId(const image_t image_id) {
     keypoints[i].x = static_cast<float>(image.Point2D(i).X());
     keypoints[i].y = static_cast<float>(image.Point2D(i).Y());
   }
+  std::vector<LineSegment> lines;
+  std::transform(image.Lines2D().begin(), image.Lines2D().end(),
+                 std::back_inserter(lines), [](const auto& line) {
+                   return LineSegment{.start = line.XY1(), .end = line.XY2()};
+                 });
 
   const std::string path = JoinPaths(*options_->image_path, image.Name());
-  ReadAndShowWithKeypoints(path, keypoints, tri_mask);
+  ReadAndShowWithKeypoints(path, keypoints, lines, tri_mask);
 }
 
 void DatabaseImageViewerWidget::ResizeTable() {

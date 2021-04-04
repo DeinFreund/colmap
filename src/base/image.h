@@ -38,6 +38,8 @@
 #include <Eigen/Core>
 
 #include "base/camera.h"
+#include "base/line.h"
+#include "base/line2d.h"
 #include "base/point2d.h"
 #include "base/visibility_pyramid.h"
 #include "util/alignment.h"
@@ -148,6 +150,13 @@ class Image {
   void SetPoints2D(const std::vector<Eigen::Vector2d>& points);
   void SetPoints2D(const std::vector<class Point2D>& points);
 
+  // Access the coordinates of image line segments.
+  inline const class Line2D& Line2D(const line2D_t line2D_idx) const;
+  inline class Line2D& Line2D(const line2D_t line2D_idx);
+  inline const std::vector<class Line2D>& Lines2D() const;
+  void SetLines2D(const std::vector<LineSegment>& lines);
+  void SetLines2D(const std::vector<class Line2D>& lines);
+    
   // Set the point as triangulated, i.e. it is part of a 3D point track.
   void SetPoint3DForPoint2D(const point2D_t point2D_idx,
                             const point3D_t point3D_id);
@@ -236,9 +245,9 @@ class Image {
   // All image points, including points that are not part of a 3D point track.
   std::vector<class Point2D> points2D_;
 
-    // All image line segments
-    std::vector<LineSegment> line_segments_;
-    
+  // All image line segments, matched or not
+  std::vector<class Line2D> lines2D_;
+
   // Per image point, the number of correspondences that have a 3D point.
   std::vector<image_t> num_correspondences_have_point3D_;
 
@@ -355,6 +364,17 @@ class Point2D& Image::Point2D(const point2D_t point2D_idx) {
 }
 
 const std::vector<class Point2D>& Image::Points2D() const { return points2D_; }
+
+const class Line2D& Image::Line2D(const line2D_t line2D_idx) const {
+  return lines2D_.at(line2D_idx);
+}
+
+class Line2D& Image::Line2D(const line2D_t line2D_idx) {
+  return lines2D_.at(line2D_idx);
+}
+
+const std::vector<class Line2D>& Image::Lines2D() const { return lines2D_; }
+
 
 bool Image::IsPoint3DVisible(const point2D_t point2D_idx) const {
   return num_correspondences_have_point3D_.at(point2D_idx) > 0;

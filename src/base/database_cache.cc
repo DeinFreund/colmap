@@ -150,7 +150,10 @@ void DatabaseCache::Load(const Database& database, const size_t min_num_matches,
             database.ReadKeypoints(image.ImageId());
         const std::vector<Eigen::Vector2d> points =
             FeatureKeypointsToPointsVector(keypoints);
+        const std::vector<LineSegment> lines =
+            database.ReadLineSegments(image.ImageId());
         images_[image.ImageId()].SetPoints2D(points);
+        images_[image.ImageId()].SetLines2D(lines);
       }
     }
 
