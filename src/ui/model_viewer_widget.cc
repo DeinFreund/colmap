@@ -250,6 +250,9 @@ void ModelViewerWidget::paintGL() {
   point_painter_.Render(pmv_matrix, point_size_);
   point_connection_painter_.Render(pmv_matrix, width(), height(), 1);
 
+  // Lines
+  line_painter_.Render(pmv_matrix, width(), height(), point_size_);
+
   // Images
   image_line_painter_.Render(pmv_matrix, width(), height(), 1);
   image_triangle_painter_.Render(pmv_matrix);
@@ -274,6 +277,7 @@ void ModelViewerWidget::ReloadReconstruction() {
 
   cameras = reconstruction->Cameras();
   points3D = reconstruction->Points3D();
+  lines3D = reconstruction->Lines3D();
   reg_image_ids = reconstruction->RegImageIds();
 
   images.clear();
@@ -282,8 +286,8 @@ void ModelViewerWidget::ReloadReconstruction() {
   }
 
   statusbar_status_label->setText(QString().sprintf(
-      "%d Images - %d Points", static_cast<int>(reg_image_ids.size()),
-      static_cast<int>(points3D.size())));
+      "%d Images - %d Points - %d Lines", static_cast<int>(reg_image_ids.size()),
+      static_cast<int>(points3D.size()), static_cast<int>(lines3D.size())));
 
   Upload();
 }
@@ -292,6 +296,7 @@ void ModelViewerWidget::ClearReconstruction() {
   cameras.clear();
   images.clear();
   points3D.clear();
+  lines3D.clear();
   reg_image_ids.clear();
   reconstruction = nullptr;
   Upload();
@@ -647,6 +652,7 @@ void ModelViewerWidget::SetupPainters() {
   coordinate_grid_painter_.Setup();
 
   point_painter_.Setup();
+  line_painter_.Setup();
   point_connection_painter_.Setup();
 
   image_line_painter_.Setup();
@@ -675,6 +681,7 @@ void ModelViewerWidget::Upload() {
   ComposeProjectionMatrix();
 
   UploadPointData();
+  UploadLineData();
   UploadImageData();
   UploadMovieGrabberData();
   UploadPointConnectionData();
@@ -817,6 +824,46 @@ void ModelViewerWidget::UploadPointData(const bool selection_mode) {
   }
 
   point_painter_.Upload(data);
+}
+
+void ModelViewerWidget::UploadLineData() {
+  makeCurrent();
+
+  std::vector<LinePainter::Data> data;
+
+  // Assume we want to display the majority of lines
+  data.reserve(lines3D.size());
+
+  const size_t min_track_len =
+      static_cast<size_t>(options_->render->min_track_len);
+
+  for (const auto& line3D : lines3D) {
+    if (line3D.second.Error() <= options_->render->max_error &&
+        line3D.second.Track().Length() >= min_track_len) {
+      LinePainter::Data painter_line;
+
+      painter_line.point1.x = static_cast<float>(line3D.second.XYZ1(0));
+      painter_line.point1.y = static_cast<float>(line3D.second.XYZ1(1));
+      painter_line.point1.z = static_cast<float>(line3D.second.XYZ1(2));
+
+      painter_line.point2.x = static_cast<float>(line3D.second.XYZ2(0));
+      painter_line.point2.y = static_cast<float>(line3D.second.XYZ2(1));
+      painter_line.point2.z = static_cast<float>(line3D.second.XYZ2(2));
+
+      const Eigen::Vector4f color(line3D.second.Color(0) / 255.0f,
+                                  line3D.second.Color(1) / 255.0f,
+                                  line3D.second.Color(2) / 255.0f, 1.0f);
+
+      painter_line.point1.r = painter_line.point2.r = color(0);
+      painter_line.point1.g = painter_line.point2.g = color(1);
+      painter_line.point1.b = painter_line.point2.b = color(2);
+      painter_line.point1.a = painter_line.point2.a = color(3);
+
+      data.push_back(painter_line);
+    }
+  }
+
+  line_painter_.Upload(data);
 }
 
 void ModelViewerWidget::UploadPointConnectionData() {

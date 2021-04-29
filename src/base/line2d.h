@@ -58,19 +58,19 @@ class Line2D {
   
   inline void SetXY(const Eigen::Vector2d& xy1, const Eigen::Vector2d& xy2);
 
-  // The identifier of the observed 3D point. If the image point does not
-  // observe a 3D point, the identifier is `kInvalidPoint3Did`.
-  inline point3D_t Line3DId() const;
+  // The identifier of the observed 3D line. If the image line does not
+  // observe a 3D line, the identifier is `kInvalidLine3Did`.
+  inline line3D_t Line3DId() const;
   inline bool HasLine3D() const;
-  inline void SetLine3DId(const point3D_t point3D_id);
+  inline void SetLine3DId(const line3D_t line3D_id);
 
  private:
   // The image coordinates in pixels, starting at upper left corner with 0.
   Eigen::Vector2d xy1_, xy2_;
 
   // The identifier of the 3D line. If the 2D line is not part of a 3D line
-  // track the identifier is `kInvalidPoint3DId` and `HasLine3D() = false`.
-  point3D_t line3D_id_;
+  // track the identifier is `kInvalidLine3DId` and `HasLine3D() = false`.
+  line3D_t line3D_id_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -89,11 +89,11 @@ double Line2D::Y2() const { return xy2_.y(); }
 
 void Line2D::SetXY(const Eigen::Vector2d& xy1, const Eigen::Vector2d& xy2) { xy1_ = xy1; xy2_ = xy2; }
 
-point3D_t Line2D::Line3DId() const { return line3D_id_; }
+line3D_t Line2D::Line3DId() const { return line3D_id_; }
 
-bool Line2D::HasLine3D() const { return line3D_id_ != kInvalidPoint3DId; }
+bool Line2D::HasLine3D() const { return line3D_id_ != kInvalidLine3DId; }
 
-void Line2D::SetLine3DId(const point3D_t line3D_id) {
+void Line2D::SetLine3DId(const line3D_t line3D_id) {
   line3D_id_ = line3D_id;
 }
 

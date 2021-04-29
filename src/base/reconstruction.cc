@@ -45,7 +45,7 @@
 namespace colmap {
 
 Reconstruction::Reconstruction()
-    : correspondence_graph_(nullptr), num_added_points3D_(0) {}
+    : correspondence_graph_(nullptr), num_added_points3D_(0),num_added_lines3D_(0) {}
 
 std::unordered_set<point3D_t> Reconstruction::Point3DIds() const {
   std::unordered_set<point3D_t> point3D_ids;
@@ -191,6 +191,24 @@ point3D_t Reconstruction::AddPoint3D(const Eigen::Vector3d& xyz,
   return point3D_id;
 }
 
+
+point3D_t Reconstruction::AddLine3D(class Line3D line) {
+  const line3D_t line3D_id = ++num_added_lines3D_;
+  CHECK(!ExistsLine3D(line3D_id));
+
+  for (const auto& track_el : line.Track().Elements()) {
+      std::cerr << "setting line3d for " << track_el.point2D_idx << " to " << line3D_id << "\n";
+    class Image& image = Image(track_el.image_id);
+    CHECK(!image.Line2D(track_el.point2D_idx).HasLine3D());
+    image.SetLine3DForLine2D(track_el.point2D_idx, line3D_id);
+    CHECK_LE(image.NumLines3D(), image.NumLines2D());
+  }
+
+  lines3D_.emplace(line3D_id, std::move(line));
+  return line3D_id;
+}
+
+
 void Reconstruction::AddObservation(const point3D_t point3D_id,
                                     const TrackElement& track_el) {
   class Image& image = Image(track_el.image_id);
@@ -205,6 +223,19 @@ void Reconstruction::AddObservation(const point3D_t point3D_id,
   const bool kIsContinuedPoint3D = true;
   SetObservationAsTriangulated(track_el.image_id, track_el.point2D_idx,
                                kIsContinuedPoint3D);
+}
+
+void Reconstruction::AddLineObservation(const line3D_t line3D_id, const image_t image_id,
+                                    const line2D_t line2D_idx) {
+    
+  class Image& image = Image(image_id);
+  CHECK(!image.Line2D(line2D_idx).HasLine3D());
+
+  image.SetLine3DForLine2D(line2D_idx, line3D_id);
+  CHECK_LE(image.NumLines3D(), image.NumLines2D());
+
+  class Line3D& line3D = Line3D(line3D_id);
+  line3D.Track().AddElement(image_id, line2D_idx);
 }
 
 point3D_t Reconstruction::MergePoints3D(const point3D_t point3D_id1,
@@ -235,6 +266,39 @@ point3D_t Reconstruction::MergePoints3D(const point3D_t point3D_id1,
   return merged_point3D_id;
 }
 
+line3D_t Reconstruction::MergeLines3D(const line3D_t line3D_id1,
+                                      const line3D_t line3D_id2) {
+  const class Line3D& line3D1 = Line3D(line3D_id1);
+  const class Line3D& line3D2 = Line3D(line3D_id2);
+
+  const Eigen::Vector3d merged_xyz1 =
+      (line3D1.Track().Length() * line3D1.XYZ1() +
+       line3D2.Track().Length() * line3D2.XYZ1()) /
+      (line3D1.Track().Length() + line3D2.Track().Length());
+  const Eigen::Vector3d merged_xyz2 =
+      (line3D1.Track().Length() * line3D1.XYZ2() +
+       line3D2.Track().Length() * line3D2.XYZ2()) /
+      (line3D1.Track().Length() + line3D2.Track().Length());
+  const Eigen::Vector3d merged_rgb =
+      (line3D1.Track().Length() * line3D1.Color().cast<double>() +
+       line3D2.Track().Length() * line3D2.Color().cast<double>()) /
+      (line3D1.Track().Length() + line3D2.Track().Length());
+
+  Track merged_track;
+  merged_track.Reserve(line3D1.Track().Length() + line3D2.Track().Length());
+  merged_track.AddElements(line3D1.Track().Elements());
+  merged_track.AddElements(line3D2.Track().Elements());
+
+  DeleteLine3D(line3D_id1);
+  DeleteLine3D(line3D_id2);
+
+  class Line3D merged_line3D(merged_xyz1, merged_xyz2, Eigen::Vector3ub(std::lround(merged_rgb.x()), std::lround(merged_rgb.y()), std::lround(merged_rgb.z())));
+  merged_line3D.SetTrack(merged_track);
+  const line3D_t merged_line3D_id = AddLine3D(std::move(merged_line3D));
+
+  return merged_line3D_id;
+}
+
 void Reconstruction::DeletePoint3D(const point3D_t point3D_id) {
   // Note: Do not change order of these instructions, especially with respect to
   // `Reconstruction::ResetTriObservations`
@@ -254,6 +318,18 @@ void Reconstruction::DeletePoint3D(const point3D_t point3D_id) {
   }
 
   points3D_.erase(point3D_id);
+}
+
+void Reconstruction::DeleteLine3D(const line3D_t line3D_id) {
+
+  const class Track& track = Line3D(line3D_id).Track();
+
+  for (const auto& track_el : track.Elements()) {
+    class Image& image = Image(track_el.image_id);
+    image.ResetLine3DForLine2D(track_el.point2D_idx);
+  }
+
+  lines3D_.erase(line3D_id);
 }
 
 void Reconstruction::DeleteObservation(const image_t image_id,
@@ -278,8 +354,27 @@ void Reconstruction::DeleteObservation(const image_t image_id,
   image.ResetPoint3DForPoint2D(point2D_idx);
 }
 
+void Reconstruction::DeleteLineObservation(const image_t image_id,
+                                       const line2D_t line2D_idx) {
+
+  class Image& image = Image(image_id);
+  const line3D_t line3D_id = image.Line2D(line2D_idx).Line3DId();
+  class Line3D& line3D = Line3D(line3D_id);
+
+  if (line3D.Track().Length() <= 2) {
+    DeleteLine3D(line3D_id);
+    return;
+  }
+
+  line3D.Track().DeleteElement(image_id, line2D_idx);
+
+  image.ResetLine3DForLine2D(line2D_idx);
+}
+
+
 void Reconstruction::DeleteAllPoints2DAndPoints3D() {
   points3D_.clear();
+  lines3D_.clear();
   for (auto& image : images_) {
     class Image new_image;
     new_image.SetImageId(image.second.ImageId());
@@ -429,6 +524,10 @@ void Reconstruction::Transform(const SimilarityTransform3& tform) {
   for (auto& point3D : points3D_) {
     tform.TransformPoint(&point3D.second.XYZ());
   }
+  for (auto& line3D : lines3D_) {
+    tform.TransformPoint(&line3D.second.XYZ1());
+    tform.TransformPoint(&line3D.second.XYZ2());
+  }
 }
 
 Reconstruction Reconstruction::Crop(
@@ -540,6 +639,42 @@ bool Reconstruction::Merge(const Reconstruction& reconstruction,
           AddPoint3D(xyz, new_track, point3D.second.Color());
       if (old_point3D_ids.size() == 1) {
         MergePoints3D(point3D_id, *old_point3D_ids.begin());
+      }
+    }
+  }
+
+  for (const auto& line3D : reconstruction.Lines3D()) {
+    Track new_track;
+    Track old_track;
+    std::unordered_set<line3D_t> old_line3D_ids;
+    for (const auto& track_el : line3D.second.Track().Elements()) {
+      if (common_image_ids.count(track_el.image_id) > 0) {
+        const auto& line2D =
+            Image(track_el.image_id).Line2D(track_el.point2D_idx);
+        if (line2D.HasLine3D()) {
+          old_track.AddElement(track_el);
+          old_line3D_ids.insert(line2D.Line3DId());
+        } else {
+          new_track.AddElement(track_el);
+        }
+      } else if (missing_image_ids.count(track_el.image_id) > 0) {
+        Image(track_el.image_id).ResetLine3DForLine2D(track_el.point2D_idx);
+        new_track.AddElement(track_el);
+      }
+    }
+
+    const bool create_new_line = new_track.Length() >= 2;
+    const bool merge_new_and_old_line =
+        (new_track.Length() + old_track.Length()) >= 2 &&
+        old_line3D_ids.size() == 1;
+    if (create_new_line || merge_new_and_old_line) {
+      class Line3D new_line = line3D.second;
+      tform.TransformPoint(&new_line.XYZ1());
+      tform.TransformPoint(&new_line.XYZ2());
+      new_line.SetTrack(new_track);
+      const auto line3D_id = AddLine3D(std::move(new_line));
+      if (old_line3D_ids.size() == 1) {
+        MergeLines3D(line3D_id, *old_line3D_ids.begin());
       }
     }
   }
@@ -661,6 +796,18 @@ size_t Reconstruction::FilterObservationsWithNegativeDepth() {
         }
       }
     }
+    for (line2D_t line2D_idx = 0; line2D_idx < image.NumLines2D();
+         ++line2D_idx) {
+      const Line2D& line2D = image.Line2D(line2D_idx);
+      if (line2D.HasLine3D()) {
+        const class Line3D& line3D = Line3D(line2D.Line3DId());
+        if (!HasPointPositiveDepth(proj_matrix, line3D.XYZ1()) ||
+            !HasPointPositiveDepth(proj_matrix, line3D.XYZ2())) {
+          DeleteLineObservation(image_id, line2D_idx);
+          num_filtered += 1;
+        }
+      }
+    }
   }
   return num_filtered;
 }
@@ -757,6 +904,7 @@ void Reconstruction::ReadBinary(const std::string& path) {
   ReadCamerasBinary(JoinPaths(path, "cameras.bin"));
   ReadImagesBinary(JoinPaths(path, "images.bin"));
   ReadPoints3DBinary(JoinPaths(path, "points3D.bin"));
+  ReadLines3DBinary(JoinPaths(path, "lines3D.bin"));
 }
 
 void Reconstruction::WriteText(const std::string& path) const {
@@ -769,6 +917,7 @@ void Reconstruction::WriteBinary(const std::string& path) const {
   WriteCamerasBinary(JoinPaths(path, "cameras.bin"));
   WriteImagesBinary(JoinPaths(path, "images.bin"));
   WritePoints3DBinary(JoinPaths(path, "points3D.bin"));
+  WriteLines3DBinary(JoinPaths(path, "lines3D.bin"));
 }
 
 std::vector<PlyPoint> Reconstruction::ConvertToPLY() const {
@@ -1835,6 +1984,45 @@ void Reconstruction::ReadPoints3DBinary(const std::string& path) {
   }
 }
 
+
+void Reconstruction::ReadLines3DBinary(const std::string& path) {
+  std::ifstream file(path, std::ios::binary);
+  if (!file.is_open()) {
+      std::cerr << "No line data found.\n";
+      return;
+  }
+
+  const size_t num_lines3D = ReadBinaryLittleEndian<uint64_t>(&file);
+  for (size_t i = 0; i < num_lines3D; ++i) {
+    class Line3D line3D;
+
+    const line3D_t line3D_id = ReadBinaryLittleEndian<line3D_t>(&file);
+    num_added_lines3D_ = std::max(num_added_lines3D_, line3D_id);
+
+    line3D.XYZ1()(0) = ReadBinaryLittleEndian<double>(&file);
+    line3D.XYZ1()(1) = ReadBinaryLittleEndian<double>(&file);
+    line3D.XYZ1()(2) = ReadBinaryLittleEndian<double>(&file);
+    line3D.XYZ2()(0) = ReadBinaryLittleEndian<double>(&file);
+    line3D.XYZ2()(1) = ReadBinaryLittleEndian<double>(&file);
+    line3D.XYZ2()(2) = ReadBinaryLittleEndian<double>(&file);
+    line3D.Color(0) = ReadBinaryLittleEndian<uint8_t>(&file);
+    line3D.Color(1) = ReadBinaryLittleEndian<uint8_t>(&file);
+    line3D.Color(2) = ReadBinaryLittleEndian<uint8_t>(&file);
+    line3D.SetError(ReadBinaryLittleEndian<double>(&file));
+
+    const size_t track_length = ReadBinaryLittleEndian<uint64_t>(&file);
+    for (size_t j = 0; j < track_length; ++j) {
+      const image_t image_id = ReadBinaryLittleEndian<image_t>(&file);
+      const line2D_t line2D_idx = ReadBinaryLittleEndian<line2D_t>(&file);
+      line3D.Track().AddElement(image_id, line2D_idx);
+    }
+    line3D.Track().Compress();
+
+    lines3D_.emplace(line3D_id, line3D);
+  }
+}
+
+
 void Reconstruction::WriteCamerasText(const std::string& path) const {
   std::ofstream file(path, std::ios::trunc);
   CHECK(file.is_open()) << path;
@@ -2044,6 +2232,35 @@ void Reconstruction::WritePoints3DBinary(const std::string& path) const {
     }
   }
 }
+
+
+void Reconstruction::WriteLines3DBinary(const std::string& path) const {
+  std::ofstream file(path, std::ios::trunc | std::ios::binary);
+  CHECK(file.is_open()) << path;
+
+  WriteBinaryLittleEndian<uint64_t>(&file, lines3D_.size());
+
+  for (const auto& line3D : lines3D_) {
+    WriteBinaryLittleEndian<line3D_t>(&file, line3D.first);
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ1()(0));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ1()(1));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ1()(2));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ2()(0));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ2()(1));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.XYZ2()(2));
+    WriteBinaryLittleEndian<uint8_t>(&file, line3D.second.Color(0));
+    WriteBinaryLittleEndian<uint8_t>(&file, line3D.second.Color(1));
+    WriteBinaryLittleEndian<uint8_t>(&file, line3D.second.Color(2));
+    WriteBinaryLittleEndian<double>(&file, line3D.second.Error());
+
+    WriteBinaryLittleEndian<uint64_t>(&file, line3D.second.Track().Length());
+    for (const auto& track_el : line3D.second.Track().Elements()) {
+      WriteBinaryLittleEndian<image_t>(&file, track_el.image_id);
+      WriteBinaryLittleEndian<line2D_t>(&file, track_el.point2D_idx);
+    }
+  }
+}
+
 
 void Reconstruction::SetObservationAsTriangulated(
     const image_t image_id, const point2D_t point2D_idx,

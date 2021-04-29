@@ -37,6 +37,7 @@
 #include "base/projection.h"
 #include "base/triangulation.h"
 #include "estimators/pose.h"
+#include "estimators/line.h"
 #include "util/bitmap.h"
 #include "util/misc.h"
 
@@ -508,6 +509,57 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     return false;
   }
 
+  for (const auto& line : reconstruction_->Lines3D()) {
+    const point2D_t matched_idx =
+        MatchLine(camera, image, line.second);
+    if (matched_idx != kInvalidLine2DIdx) {
+      reconstruction_->AddLineObservation(line.first, image.ImageId(),
+                                          matched_idx);
+      modified_line3D_ids_.insert(line.first);
+    }
+  }
+
+  // Find a good triplet for line reconstruction
+
+  std::cerr << "finding triplet\n";
+  std::vector<image_t> candidates =
+      FindSecondInitialImage(options, image.ImageId(), true);
+
+  std::cerr << "got " << candidates.size() << " candidates\n";
+  candidates.erase(
+      std::remove_if(candidates.begin(), candidates.end(),
+                     [&](const image_t& id) {
+                       return !reconstruction_->Image(id).IsRegistered();
+                     }),
+      candidates.end());
+
+  std::cerr << "kept " << candidates.size() << " candidates\n";
+  std::vector<Line3D> added_lines;
+  if (candidates.size() >= 2) {
+    const CorrespondenceGraph& correspondence_graph =
+        database_cache_->CorrespondenceGraph();
+    const Image& second_image = reconstruction_->Image(candidates[0]);
+
+    std::cerr << "finding third\n";
+    const Image& third_image = reconstruction_->Image(*std::max_element(
+        candidates.begin() + 1, candidates.end(),
+        [&](const image_t& id1, const image_t& id2) {
+          return std::min(correspondence_graph.NumCorrespondencesBetweenImages(
+                              image.ImageId(), id1),
+                          correspondence_graph.NumCorrespondencesBetweenImages(
+                              second_image.ImageId(), id1)) <
+                 std::min(correspondence_graph.NumCorrespondencesBetweenImages(
+                              image.ImageId(), id2),
+                          correspondence_graph.NumCorrespondencesBetweenImages(
+                              second_image.ImageId(), id2));
+        }));
+
+    Camera& second_camera = reconstruction_->Camera(second_image.ImageId());
+    Camera& third_camera = reconstruction_->Camera(third_image.ImageId());
+    added_lines = EstimateLines(camera, image, second_camera, second_image,
+                                third_camera, third_image);
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // Continue tracks
   //////////////////////////////////////////////////////////////////////////////
@@ -515,6 +567,11 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
   reconstruction_->RegisterImage(image_id);
   RegisterImageEvent(image_id);
 
+  for (Line3D& line : added_lines) {
+      const line3D_t line3D_id = reconstruction_->AddLine3D(std::move(line));
+      modified_line3D_ids_.insert(line3D_id);
+  }
+  
   for (size_t i = 0; i < inlier_mask.size(); ++i) {
     if (inlier_mask[i]) {
       const point2D_t point2D_idx = tri_corrs[i].first;
@@ -560,7 +617,8 @@ IncrementalMapper::LocalBundleAdjustmentReport
 IncrementalMapper::AdjustLocalBundle(
     const Options& options, const BundleAdjustmentOptions& ba_options,
     const IncrementalTriangulator::Options& tri_options, const image_t image_id,
-    const std::unordered_set<point3D_t>& point3D_ids) {
+    const std::unordered_set<point3D_t>& point3D_ids,
+    const std::unordered_set<line3D_t>& line3D_ids) {
   CHECK_NOTNULL(reconstruction_);
   CHECK(options.Check());
 
@@ -631,6 +689,22 @@ IncrementalMapper::AdjustLocalBundle(
       }
     }
 
+    // Make sure, we refine all new and short-track 3D lines, no matter if
+    // they are fully contained in the local image set or not. Do not include
+    // long track 3D lines as they are usually already very stable and adding
+    // to them to bundle adjustment and track merging/completion would slow
+    // down the local bundle adjustment significantly.
+    std::unordered_set<line3D_t> variable_line3D_ids;
+    for (const line3D_t line3D_id : line3D_ids) {
+      const Line3D& line3D = reconstruction_->Line3D(line3D_id);
+      const size_t kMaxTrackLength = 15;
+      if (!line3D.HasError() || line3D.Track().Length() <= kMaxTrackLength) {
+        ba_config.AddVariableLine(line3D_id);
+        variable_line3D_ids.insert(line3D_id);
+      }
+    }
+
+    
     // Adjust the local bundle.
     BundleAdjuster bundle_adjuster(ba_options, ba_config);
     bundle_adjuster.Solve(reconstruction_);
@@ -703,12 +777,23 @@ bool IncrementalMapper::AdjustGlobalBundle(
     ba_config.SetConstantTvec(reg_image_ids[1], {0});
   }
 
+  std::map<line3D_t, double> line_lengths;
+  std::map<line3D_t, Eigen::Vector3d> line_dir;
+  for (const auto& line : reconstruction_->Lines3D()) {
+      line_lengths[line.first] = line.second.Length();
+      line_dir[line.first] = (line.second.XYZ2() -line.second.XYZ1()).normalized();
+  }
+  
   // Run bundle adjustment.
   BundleAdjuster bundle_adjuster(ba_options, ba_config);
   if (!bundle_adjuster.Solve(reconstruction_)) {
     return false;
   }
 
+  for (const auto& line : reconstruction_->Lines3D()) {
+      CHECK_LT(std::abs(line_lengths[line.first] - (line.second.XYZ2() -line.second.XYZ1()).dot(line_dir[line.first])), 1e-3);
+  }
+  
   // Normalize scene for numerical stability and
   // to avoid large scale changes in viewer.
   reconstruction_->Normalize();
@@ -801,6 +886,14 @@ void IncrementalMapper::ClearModifiedPoints3D() {
   triangulator_->ClearModifiedPoints3D();
 }
 
+const std::unordered_set<line3D_t>& IncrementalMapper::GetModifiedLines3D() {
+    return modified_line3D_ids_;
+}
+
+void IncrementalMapper::ClearModifiedLines3D() {
+    modified_line3D_ids_.clear();
+}
+
 std::vector<image_t> IncrementalMapper::FindFirstInitialImage(
     const Options& options) const {
   // Struct to hold meta-data for ranking images.
@@ -872,7 +965,7 @@ std::vector<image_t> IncrementalMapper::FindFirstInitialImage(
 }
 
 std::vector<image_t> IncrementalMapper::FindSecondInitialImage(
-    const Options& options, const image_t image_id1) const {
+    const Options& options, const image_t image_id1, bool ignore_registrations) const {
   const CorrespondenceGraph& correspondence_graph =
       database_cache_->CorrespondenceGraph();
 
@@ -885,7 +978,7 @@ std::vector<image_t> IncrementalMapper::FindSecondInitialImage(
     for (const auto& corr :
          correspondence_graph.FindCorrespondences(image_id1, point2D_idx)) {
       if (num_registrations_.count(corr.image_id) == 0 ||
-          num_registrations_.at(corr.image_id) == 0) {
+          num_registrations_.at(corr.image_id) == 0 || ignore_registrations) {
         num_correspondences[corr.image_id] += 1;
       }
     }

@@ -80,6 +80,24 @@ void Image::SetLines2D(const std::vector<class Line2D>& lines) {
   lines2D_ = lines;
 }
 
+void Image::SetLine3DForLine2D(const line2D_t line2D_idx,
+                                 const line3D_t line3D_id) {
+  CHECK_NE(line3D_id, kInvalidLine3DId);
+  class Line2D& line2D = lines2D_.at(line2D_idx);
+  if (!line2D.HasLine3D()) {
+    num_lines3D_ += 1;
+  }
+  line2D.SetLine3DId(line3D_id);
+}
+
+void Image::ResetLine3DForLine2D(const line2D_t line2D_idx) {
+  class Line2D& line2D = lines2D_.at(line2D_idx);
+  if (line2D.HasLine3D()) {
+    line2D.SetLine3DId(kInvalidLine3DId);
+    num_lines3D_ -= 1;
+  }
+}
+
 void Image::SetPoints2D(const std::vector<Eigen::Vector2d>& points) {
   CHECK(points2D_.empty());
   points2D_.resize(points.size());

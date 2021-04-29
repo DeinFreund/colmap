@@ -86,9 +86,16 @@ class Image {
   // Get the number of image points.
   inline point2D_t NumPoints2D() const;
 
+  // Get the number of image lines.
+  inline point2D_t NumLines2D() const;
+
   // Get the number of triangulations, i.e. the number of points that
   // are part of a 3D point track.
   inline point2D_t NumPoints3D() const;
+
+  // Get the number of triangulations, i.e. the number of lines that
+  // are part of a 3D line track.
+  inline line2D_t NumLines3D() const;
 
   // Get the number of observations, i.e. the number of image points that
   // have at least one correspondence to another image.
@@ -156,6 +163,13 @@ class Image {
   inline const std::vector<class Line2D>& Lines2D() const;
   void SetLines2D(const std::vector<LineSegment>& lines);
   void SetLines2D(const std::vector<class Line2D>& lines);
+
+  // Set the line as triangulated, i.e. it is part of a 3D line track.
+  void SetLine3DForLine2D(const line2D_t line2D_idx,
+                            const line3D_t line3D_id);
+
+  // Set the line as not triangulated, i.e. it is not part of a 3D line track.
+  void ResetLine3DForLine2D(const line2D_t line2D_idx);
     
   // Set the point as triangulated, i.e. it is part of a 3D point track.
   void SetPoint3DForPoint2D(const point2D_t point2D_idx,
@@ -222,6 +236,10 @@ class Image {
   // where `point3D_id != kInvalidPoint3DId`.
   point2D_t num_points3D_;
 
+  // The number of 3D lines the image observes, i.e. the sum of its `lines2D`
+  // where `line3D_id != kInvalidLine3DId`.
+  line2D_t num_lines3D_;
+
   // The number of image points that have at least one correspondence to
   // another image.
   point2D_t num_observations_;
@@ -287,7 +305,13 @@ point2D_t Image::NumPoints2D() const {
   return static_cast<point2D_t>(points2D_.size());
 }
 
+point2D_t Image::NumLines2D() const {
+  return static_cast<line2D_t>(lines2D_.size());
+}
+
 point2D_t Image::NumPoints3D() const { return num_points3D_; }
+
+line2D_t Image::NumLines3D() const { return num_lines3D_; }
 
 point2D_t Image::NumObservations() const { return num_observations_; }
 

@@ -204,7 +204,7 @@ class IncrementalMapper {
   LocalBundleAdjustmentReport AdjustLocalBundle(
       const Options& options, const BundleAdjustmentOptions& ba_options,
       const IncrementalTriangulator::Options& tri_options,
-      const image_t image_id, const std::unordered_set<point3D_t>& point3D_ids);
+      const image_t image_id, const std::unordered_set<point3D_t>& point3D_ids, const std::unordered_set<line3D_t>& line3D_ids);
 
   // Global bundle adjustment using Ceres Solver or PBA.
   bool AdjustGlobalBundle(const Options& options,
@@ -232,6 +232,12 @@ class IncrementalMapper {
   // Clear the collection of changed 3D points.
   void ClearModifiedPoints3D();
 
+  // Get changed 3D lines, since the last call to `ClearModifiedLines3D`.
+  const std::unordered_set<line3D_t>& GetModifiedLines3D();
+
+  // Clear the collection of changed 3D lines.
+  void ClearModifiedLines3D();
+
  private:
   // Find seed images for incremental reconstruction. Suitable seed images have
   // a large number of correspondences and have camera calibration priors. The
@@ -243,7 +249,7 @@ class IncrementalMapper {
   // to the first image and have camera calibration priors. The returned list is
   // ordered such that most suitable images are in the front.
   std::vector<image_t> FindSecondInitialImage(const Options& options,
-                                              const image_t image_id1) const;
+                                              const image_t image_id1, bool ignore_registrations = false) const;
 
   // Find local bundle for given image in the reconstruction. The local bundle
   // is defined as the images that are most connected, i.e. maximum number of
@@ -306,6 +312,11 @@ class IncrementalMapper {
   // This image list will be non-empty, if the reconstruction is continued from
   // an existing reconstruction.
   std::unordered_set<image_t> existing_image_ids_;
+    
+  // Changed 3D lines, i.e. if a 3D line is modified (created, continued,
+  // deleted, merged, etc.). Cleared once `ModifiedLines3D` is called.
+  std::unordered_set<line3D_t> modified_line3D_ids_;
+
 };
 
 }  // namespace colmap

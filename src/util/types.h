@@ -95,6 +95,11 @@ typedef uint32_t line2D_t;
 // unique indices should be large.
 typedef uint64_t point3D_t;
 
+// Unique identifier per added 3D line. Since we add many 3D lines,
+// delete them, and possibly re-add them again, the maximum number of allowed
+// unique indices should be large.
+typedef uint64_t line3D_t;
+
 // Values for invalid identifiers or indices.
 const camera_t kInvalidCameraId = std::numeric_limits<camera_t>::max();
 const image_t kInvalidImageId = std::numeric_limits<image_t>::max();
@@ -102,6 +107,8 @@ const image_pair_t kInvalidImagePairId =
     std::numeric_limits<image_pair_t>::max();
 const point2D_t kInvalidPoint2DIdx = std::numeric_limits<point2D_t>::max();
 const point3D_t kInvalidPoint3DId = std::numeric_limits<point3D_t>::max();
+const line2D_t kInvalidLine2DIdx = std::numeric_limits<line2D_t>::max();
+const line3D_t kInvalidLine3DId = std::numeric_limits<line3D_t>::max();
 
 }  // namespace colmap
 

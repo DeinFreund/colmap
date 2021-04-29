@@ -126,6 +126,7 @@ class ModelViewerWidget : public QOpenGLWidget,
   EIGEN_STL_UMAP(camera_t, Camera) cameras;
   EIGEN_STL_UMAP(image_t, Image) images;
   EIGEN_STL_UMAP(point3D_t, Point3D) points3D;
+  EIGEN_STL_UMAP(line3D_t, Line3D) lines3D;
   std::vector<image_t> reg_image_ids;
 
   QLabel* statusbar_status_label;
@@ -147,6 +148,7 @@ class ModelViewerWidget : public QOpenGLWidget,
   void Upload();
   void UploadCoordinateGridData();
   void UploadPointData(const bool selection_mode = false);
+  void UploadLineData();
   void UploadPointConnectionData();
   void UploadImageData(const bool selection_mode = false);
   void UploadImageConnectionData();
@@ -169,6 +171,7 @@ class ModelViewerWidget : public QOpenGLWidget,
   LinePainter coordinate_grid_painter_;
 
   PointPainter point_painter_;
+  LinePainter line_painter_;
   LinePainter point_connection_painter_;
 
   LinePainter image_line_painter_;

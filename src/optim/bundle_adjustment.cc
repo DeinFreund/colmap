@@ -104,6 +104,14 @@ size_t BundleAdjustmentConfig::NumConstantPoints() const {
   return constant_point3D_ids_.size();
 }
 
+size_t BundleAdjustmentConfig::NumVariableLines() const {
+  return variable_line3D_ids_.size();
+}
+
+size_t BundleAdjustmentConfig::NumConstantLines() const {
+  return constant_line3D_ids_.size();
+}
+
 size_t BundleAdjustmentConfig::NumResiduals(
     const Reconstruction& reconstruction) const {
   // Count the number of observations for all added images.
@@ -208,6 +216,16 @@ const std::unordered_set<point3D_t>& BundleAdjustmentConfig::ConstantPoints()
   return constant_point3D_ids_;
 }
 
+const std::unordered_set<line3D_t>& BundleAdjustmentConfig::VariableLines()
+    const {
+  return variable_line3D_ids_;
+}
+
+const std::unordered_set<line3D_t>& BundleAdjustmentConfig::ConstantLines()
+    const {
+  return constant_line3D_ids_;
+}
+
 const std::vector<int>& BundleAdjustmentConfig::ConstantTvec(
     const image_t image_id) const {
   return constant_tvecs_.at(image_id);
@@ -244,6 +262,40 @@ void BundleAdjustmentConfig::RemoveVariablePoint(const point3D_t point3D_id) {
 void BundleAdjustmentConfig::RemoveConstantPoint(const point3D_t point3D_id) {
   constant_point3D_ids_.erase(point3D_id);
 }
+
+
+void BundleAdjustmentConfig::AddVariableLine(const line3D_t line3D_id) {
+  CHECK(!HasConstantLine(line3D_id));
+  variable_line3D_ids_.insert(line3D_id);
+}
+
+void BundleAdjustmentConfig::AddConstantLine(const line3D_t line3D_id) {
+  CHECK(!HasVariableLine(line3D_id));
+  constant_line3D_ids_.insert(line3D_id);
+}
+
+bool BundleAdjustmentConfig::HasLine(const line3D_t line3D_id) const {
+  return HasVariableLine(line3D_id) || HasConstantLine(line3D_id);
+}
+
+bool BundleAdjustmentConfig::HasVariableLine(
+    const line3D_t line3D_id) const {
+  return variable_line3D_ids_.find(line3D_id) != variable_line3D_ids_.end();
+}
+
+bool BundleAdjustmentConfig::HasConstantLine(
+    const line3D_t line3D_id) const {
+  return constant_line3D_ids_.find(line3D_id) != constant_line3D_ids_.end();
+}
+
+void BundleAdjustmentConfig::RemoveVariableLine(const line3D_t line3D_id) {
+  variable_line3D_ids_.erase(line3D_id);
+}
+
+void BundleAdjustmentConfig::RemoveConstantLine(const line3D_t line3D_id) {
+  constant_line3D_ids_.erase(line3D_id);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // BundleAdjuster
@@ -336,6 +388,12 @@ void BundleAdjuster::SetUp(Reconstruction* reconstruction,
   for (const auto point3D_id : config_.ConstantPoints()) {
     AddPointToProblem(point3D_id, reconstruction, loss_function);
   }
+  for (const auto line3D_id : config_.VariableLines()) {
+    AddLineToProblem(line3D_id, reconstruction, loss_function);
+  }
+  for (const auto line3D_id : config_.ConstantLines()) {
+    AddLineToProblem(line3D_id, reconstruction, loss_function);
+  }
 
   ParameterizeCameras(reconstruction);
   ParameterizePoints(reconstruction);
@@ -411,6 +469,64 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
     }
   }
 
+  for (const Line2D& line2D : image.Lines2D()) {
+    if (!line2D.HasLine3D()) {
+      continue;
+    }
+
+    num_observations += 1;
+    line3D_num_observations_[line2D.Line3DId()] += 1;
+
+    Line3D& line3D = reconstruction->Line3D(line2D.Line3DId());
+    assert(line3D.Track().Length() > 1);
+
+    ceres::CostFunction* cost_function = nullptr;
+
+    if (constant_pose) {
+      switch (camera.ModelId()) {
+#define CAMERA_MODEL_CASE(CameraModel)                                 \
+  case CameraModel::kModelId:                                          \
+    cost_function =                                                    \
+        LineBundleAdjustmentConstantPoseCostFunction<CameraModel>::Create( \
+            image.Qvec(), image.Tvec(), line2D.XY1(), line2D.XY2());                 \
+    break;
+
+        CAMERA_MODEL_SWITCH_CASES
+
+#undef CAMERA_MODEL_CASE
+      }
+
+      problem_->AddResidualBlock(cost_function, loss_function,
+                                 line3D.XYZ1().data(),line3D.XYZ2().data(), camera_params_data);
+    } else {
+      switch (camera.ModelId()) {
+#define CAMERA_MODEL_CASE(CameraModel)                                   \
+  case CameraModel::kModelId:                                            \
+    cost_function =                                                      \
+    LineBundleAdjustmentCostFunction<CameraModel>::Create(line2D.XY1(),line2D.XY2()); \
+    break;
+
+        CAMERA_MODEL_SWITCH_CASES
+
+#undef CAMERA_MODEL_CASE
+      }
+
+      problem_->AddResidualBlock(cost_function, loss_function, qvec_data,
+                                 tvec_data, line3D.XYZ1().data(),
+                                 line3D.XYZ2().data(), camera_params_data);
+    }
+
+    std::cerr << "line " << line2D.Line3DId() << " has length " << line3D.Length() << "\n";
+    CHECK_GT(line3D.Length(), 1e-6);
+    ceres::LocalParameterization* plane_parameterization =
+        new ceres::AutoDiffLocalParameterization<PlaneParameterizationPlus, 3,
+                                                 2>(
+            new PlaneParameterizationPlus(
+                (line3D.XYZ1() - line3D.XYZ2()).normalized()));
+    problem_->SetParameterization(line3D.XYZ1().data(), plane_parameterization);
+    problem_->SetParameterization(line3D.XYZ2().data(), plane_parameterization);
+  }
+
   if (num_observations > 0) {
     camera_ids_.insert(image.CameraId());
 
@@ -480,6 +596,60 @@ void BundleAdjuster::AddPointToProblem(const point3D_t point3D_id,
                                point3D.XYZ().data(), camera.ParamsData());
   }
 }
+
+
+void BundleAdjuster::AddLineToProblem(const line3D_t line3D_id,
+                                       Reconstruction* reconstruction,
+                                       ceres::LossFunction* loss_function) {
+  Line3D& line3D = reconstruction->Line3D(line3D_id);
+
+  // Is 3D line already fully contained in the problem? I.e. its entire track
+  // is contained in `variable_image_ids`, `constant_image_ids`,
+  // `constant_x_image_ids`.
+  if (line3D_num_observations_[line3D_id] == line3D.Track().Length()) {
+    return;
+  }
+
+  for (const auto& track_el : line3D.Track().Elements()) {
+    // Skip observations that were already added in `FillImages`.
+    if (config_.HasImage(track_el.image_id)) {
+      continue;
+    }
+
+    line3D_num_observations_[line3D_id] += 1;
+
+    Image& image = reconstruction->Image(track_el.image_id);
+    Camera& camera = reconstruction->Camera(image.CameraId());
+    const Line2D& line2D = image.Line2D(track_el.point2D_idx);
+
+    // We do not want to refine the camera of images that are not
+    // part of `constant_image_ids_`, `constant_image_ids_`,
+    // `constant_x_image_ids_`.
+    if (camera_ids_.count(image.CameraId()) == 0) {
+      camera_ids_.insert(image.CameraId());
+      config_.SetConstantCamera(image.CameraId());
+    }
+
+    ceres::CostFunction* cost_function = nullptr;
+
+    switch (camera.ModelId()) {
+#define CAMERA_MODEL_CASE(CameraModel)                                 \
+  case CameraModel::kModelId:                                          \
+    cost_function =                                                    \
+        LineBundleAdjustmentConstantPoseCostFunction<CameraModel>::Create( \
+            image.Qvec(), image.Tvec(), line2D.XY1(),line2D.XY2());                 \
+    break;
+
+      CAMERA_MODEL_SWITCH_CASES
+
+#undef CAMERA_MODEL_CASE
+    }
+    problem_->AddResidualBlock(cost_function, loss_function,
+                               line3D.XYZ1().data(),
+                               line3D.XYZ2().data(), camera.ParamsData());
+  }
+}
+
 
 void BundleAdjuster::ParameterizeCameras(Reconstruction* reconstruction) {
   const bool constant_camera = !options_.refine_focal_length &&

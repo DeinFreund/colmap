@@ -48,6 +48,7 @@ COLMAP_ADD_SOURCES(
     triangulation.h triangulation.cc
     two_view_geometry.h two_view_geometry.cc
     utils.h utils.cc
+    line.h line.cc
 )
 
 COLMAP_ADD_TEST(absolute_pose_test absolute_pose_test.cc)

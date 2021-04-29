@@ -52,6 +52,10 @@ class Line3D {
 
   Line3D();
 
+  Line3D(Eigen::Vector3d xyz1, Eigen::Vector3d xyz2,
+         Eigen::Vector3ub color = Eigen::Vector3ub(0, 0, 0),
+         double error = -1.0);
+
   // The point coordinate in world space.  
   inline const Eigen::Vector3d& XYZ1() const;
   inline const Eigen::Vector3d& XYZ2() const;
@@ -68,6 +72,7 @@ class Line3D {
   inline double Y2() const;
   inline double Z2() const;
   inline void SetXYZ(const Eigen::Vector3d& xyz1, const Eigen::Vector3d& xyz2);
+    inline double Length() const;
   
   // The RGB color of the point.
   inline const Eigen::Vector3ub& Color() const;
@@ -141,6 +146,7 @@ void Line3D::SetXYZ(const Eigen::Vector3d& xyz1, const Eigen::Vector3d& xyz2) {
    xyz2_ = xyz2;
 }
 
+double Line3D::Length() const { return (xyz1_ - xyz2_).norm(); }
 
 const Eigen::Vector3ub& Line3D::Color() const { return color_; }
 

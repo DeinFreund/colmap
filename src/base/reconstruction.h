@@ -44,6 +44,8 @@
 #include "base/image.h"
 #include "base/point2d.h"
 #include "base/point3d.h"
+#include "base/line2d.h"
+#include "base/line3d.h"
 #include "base/similarity_transform.h"
 #include "base/track.h"
 #include "estimators/similarity_transform.h"
@@ -83,6 +85,7 @@ class Reconstruction {
   inline const class Camera& Camera(const camera_t camera_id) const;
   inline const class Image& Image(const image_t image_id) const;
   inline const class Point3D& Point3D(const point3D_t point3D_id) const;
+  inline const class Line3D& Line3D(const line3D_t line3D_id) const;
   inline const ImagePairStat& ImagePair(const image_pair_t pair_id) const;
   inline ImagePairStat& ImagePair(const image_t image_id1,
                                   const image_t image_id2);
@@ -91,6 +94,7 @@ class Reconstruction {
   inline class Camera& Camera(const camera_t camera_id);
   inline class Image& Image(const image_t image_id);
   inline class Point3D& Point3D(const point3D_t point3D_id);
+  inline class Line3D& Line3D(const line3D_t line3D_id);
   inline ImagePairStat& ImagePair(const image_pair_t pair_id);
   inline const ImagePairStat& ImagePair(const image_t image_id1,
                                         const image_t image_id2) const;
@@ -100,6 +104,7 @@ class Reconstruction {
   inline const EIGEN_STL_UMAP(image_t, class Image) & Images() const;
   inline const std::vector<image_t>& RegImageIds() const;
   inline const EIGEN_STL_UMAP(point3D_t, class Point3D) & Points3D() const;
+  inline const EIGEN_STL_UMAP(line3D_t, class Line3D) & Lines3D() const;
   inline const std::unordered_map<image_pair_t, ImagePairStat>& ImagePairs()
       const;
 
@@ -110,6 +115,7 @@ class Reconstruction {
   inline bool ExistsCamera(const camera_t camera_id) const;
   inline bool ExistsImage(const image_t image_id) const;
   inline bool ExistsPoint3D(const point3D_t point3D_id) const;
+  inline bool ExistsLine3D(const line3D_t line3D_id) const;
   inline bool ExistsImagePair(const image_pair_t pair_id) const;
 
   // Load data from given `DatabaseCache`.
@@ -139,8 +145,15 @@ class Reconstruction {
       const Eigen::Vector3d& xyz, const Track& track,
       const Eigen::Vector3ub& color = Eigen::Vector3ub::Zero());
 
+  // Add new 3D line, and return its unique ID.
+  line3D_t AddLine3D(class Line3D line);
+
   // Add observation to existing 3D point.
   void AddObservation(const point3D_t point3D_id, const TrackElement& track_el);
+
+  // Add observation to existing 3D line.
+  void AddLineObservation(const line3D_t line3D_id, const image_t image_id,
+                      const line2D_t line2D_idx);
 
   // Merge two 3D points and return new identifier of new 3D point.
   // The location of the merged 3D point is a weighted average of the two
@@ -148,13 +161,27 @@ class Reconstruction {
   point3D_t MergePoints3D(const point3D_t point3D_id1,
                           const point3D_t point3D_id2);
 
+  // Merge two 3D lines and return new identifier of new 3D line.
+  // The location of the merged 3D line is a weighted average of the two
+  // original 3D line's locations according to their track lengths.
+  line3D_t MergeLines3D(const line3D_t line3D_id1,
+                          const line3D_t line3D_id2);
+
   // Delete a 3D point, and all its references in the observed images.
   void DeletePoint3D(const point3D_t point3D_id);
+
+  // Delete a 3D line, and all its references in the observed images.
+  void DeleteLine3D(const line3D_t line3D_id);
 
   // Delete one observation from an image and the corresponding 3D point.
   // Note that this deletes the entire 3D point, if the track has two elements
   // prior to calling this method.
   void DeleteObservation(const image_t image_id, const point2D_t point2D_idx);
+
+  // Delete one observation from an image and the corresponding 3D line.
+  // Note that this deletes the entire 3D line, if the track has two elements
+  // prior to calling this method.
+  void DeleteLineObservation(const image_t image_id, const line2D_t line2D_idx);
 
   // Delete all 2D points of all images and all 3D points.
   void DeleteAllPoints2DAndPoints3D();
@@ -403,6 +430,7 @@ class Reconstruction {
   void ReadCamerasBinary(const std::string& path);
   void ReadImagesBinary(const std::string& path);
   void ReadPoints3DBinary(const std::string& path);
+  void ReadLines3DBinary(const std::string& path);
 
   void WriteCamerasText(const std::string& path) const;
   void WriteImagesText(const std::string& path) const;
@@ -410,6 +438,7 @@ class Reconstruction {
   void WriteCamerasBinary(const std::string& path) const;
   void WriteImagesBinary(const std::string& path) const;
   void WritePoints3DBinary(const std::string& path) const;
+  void WriteLines3DBinary(const std::string& path) const;
 
   void SetObservationAsTriangulated(const image_t image_id,
                                     const point2D_t point2D_idx,
@@ -422,6 +451,7 @@ class Reconstruction {
   EIGEN_STL_UMAP(camera_t, class Camera) cameras_;
   EIGEN_STL_UMAP(image_t, class Image) images_;
   EIGEN_STL_UMAP(point3D_t, class Point3D) points3D_;
+  EIGEN_STL_UMAP(line3D_t, class Line3D) lines3D_;
 
   std::unordered_map<image_pair_t, ImagePairStat> image_pair_stats_;
 
@@ -430,6 +460,9 @@ class Reconstruction {
 
   // Total number of added 3D points, used to generate unique identifiers.
   point3D_t num_added_points3D_;
+    
+  // Total number of added 3D lines, used to generate unique identifiers.
+  point3D_t num_added_lines3D_;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -460,6 +493,10 @@ const class Point3D& Reconstruction::Point3D(const point3D_t point3D_id) const {
   return points3D_.at(point3D_id);
 }
 
+const class Line3D& Reconstruction::Line3D(const line3D_t line3D_id) const {
+  return lines3D_.at(line3D_id);
+}
+
 const Reconstruction::ImagePairStat& Reconstruction::ImagePair(
     const image_pair_t pair_id) const {
   return image_pair_stats_.at(pair_id);
@@ -481,6 +518,10 @@ class Image& Reconstruction::Image(const image_t image_id) {
 
 class Point3D& Reconstruction::Point3D(const point3D_t point3D_id) {
   return points3D_.at(point3D_id);
+}
+
+class Line3D& Reconstruction::Line3D(const line3D_t line3D_id) {
+  return lines3D_.at(line3D_id);
 }
 
 Reconstruction::ImagePairStat& Reconstruction::ImagePair(
@@ -510,6 +551,10 @@ const EIGEN_STL_UMAP(point3D_t, Point3D) & Reconstruction::Points3D() const {
   return points3D_;
 }
 
+const EIGEN_STL_UMAP(line3D_t, Line3D) & Reconstruction::Lines3D() const {
+  return lines3D_;
+}
+
 const std::unordered_map<image_pair_t, Reconstruction::ImagePairStat>&
 Reconstruction::ImagePairs() const {
   return image_pair_stats_;
@@ -525,6 +570,10 @@ bool Reconstruction::ExistsImage(const image_t image_id) const {
 
 bool Reconstruction::ExistsPoint3D(const point3D_t point3D_id) const {
   return points3D_.find(point3D_id) != points3D_.end();
+}
+
+bool Reconstruction::ExistsLine3D(const line3D_t line3D_id) const {
+  return lines3D_.find(line3D_id) != lines3D_.end();
 }
 
 bool Reconstruction::ExistsImagePair(const image_pair_t pair_id) const {
