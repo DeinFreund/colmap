@@ -49,6 +49,7 @@
 #include "base/similarity_transform.h"
 #include "base/track.h"
 #include "estimators/similarity_transform.h"
+#include "estimators/line.h"
 #include "optim/loransac.h"
 #include "util/alignment.h"
 #include "util/types.h"
@@ -284,6 +285,9 @@ class Reconstruction {
   // @return    The number of filtered observations.
   size_t FilterObservationsWithNegativeDepth();
 
+  // Recalculate line endpoints to match the given track.
+  void RecalculateLineEndpoints();
+
   // Filter images without observations or bogus camera parameters.
   //
   // @return    The identifiers of the filtered images.
@@ -419,6 +423,8 @@ class Reconstruction {
   size_t FilterPoints3DWithLargeReprojectionError(
       const double max_reproj_error,
       const std::unordered_set<point3D_t>& point3D_ids);
+
+  size_t FilterLines3DWithLargeReprojectionError();
 
   std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>
   ComputeBoundsAndCentroid(const double p0, const double p1,

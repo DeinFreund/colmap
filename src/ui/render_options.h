@@ -43,7 +43,7 @@ struct RenderOptions {
   };
 
   // Minimum track length for a point to be rendered.
-  int min_track_len = 3;
+  int min_track_len = 2;
 
   // Maximum error for a point to be rendered.
   double max_error = 2;

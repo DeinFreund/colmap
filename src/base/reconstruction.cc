@@ -356,8 +356,9 @@ void Reconstruction::DeleteObservation(const image_t image_id,
 
 void Reconstruction::DeleteLineObservation(const image_t image_id,
                                        const line2D_t line2D_idx) {
-
+  CHECK(ExistsImage(image_id));
   class Image& image = Image(image_id);
+  CHECK(image.Line2D(line2D_idx).HasLine3D());
   const line3D_t line3D_id = image.Line2D(line2D_idx).Line3DId();
   class Line3D& line3D = Line3D(line3D_id);
 
@@ -680,6 +681,8 @@ bool Reconstruction::Merge(const Reconstruction& reconstruction,
   }
 
   FilterPoints3DWithLargeReprojectionError(max_reproj_error, Point3DIds());
+  FilterLines3DWithLargeReprojectionError();
+  RecalculateLineEndpoints();
 
   return true;
 }
@@ -748,6 +751,11 @@ size_t Reconstruction::FilterPoints3D(
       FilterPoints3DWithLargeReprojectionError(max_reproj_error, point3D_ids);
   num_filtered +=
       FilterPoints3DWithSmallTriangulationAngle(min_tri_angle, point3D_ids);
+  num_filtered +=
+      FilterLines3DWithLargeReprojectionError();
+  num_filtered +=
+      FilterObservationsWithNegativeDepth();
+  RecalculateLineEndpoints();
   return num_filtered;
 }
 
@@ -772,15 +780,11 @@ size_t Reconstruction::FilterAllPoints3D(const double max_reproj_error,
   // error, so that observations with large reprojection error do not make
   // a point stable through a large triangulation angle.
   const std::unordered_set<point3D_t>& point3D_ids = Point3DIds();
-  size_t num_filtered = 0;
-  num_filtered +=
-      FilterPoints3DWithLargeReprojectionError(max_reproj_error, point3D_ids);
-  num_filtered +=
-      FilterPoints3DWithSmallTriangulationAngle(min_tri_angle, point3D_ids);
-  return num_filtered;
+  return FilterPoints3D(max_reproj_error, min_tri_angle, point3D_ids);
 }
 
 size_t Reconstruction::FilterObservationsWithNegativeDepth() {
+    std::cerr << "Filtering observations with negative depth\n";
   size_t num_filtered = 0;
   for (const auto image_id : reg_image_ids_) {
     const class Image& image = Image(image_id);
@@ -801,6 +805,7 @@ size_t Reconstruction::FilterObservationsWithNegativeDepth() {
       const Line2D& line2D = image.Line2D(line2D_idx);
       if (line2D.HasLine3D()) {
         const class Line3D& line3D = Line3D(line2D.Line3DId());
+        std::cerr << "checking line with len " << line3D.Length() << "\n";
         if (!HasPointPositiveDepth(proj_matrix, line3D.XYZ1()) ||
             !HasPointPositiveDepth(proj_matrix, line3D.XYZ2())) {
           DeleteLineObservation(image_id, line2D_idx);
@@ -809,7 +814,21 @@ size_t Reconstruction::FilterObservationsWithNegativeDepth() {
       }
     }
   }
+  for (auto & line3d : lines3D_) {
+      for (auto& el : line3d.second.Track().Elements()){
+          CHECK_EQ(Image(el.image_id).Line2D(el.point2D_idx).Line3DId(), line3d.first);
+      }
+  }
   return num_filtered;
+}
+
+void Reconstruction::RecalculateLineEndpoints() {
+    
+    std::cerr << "Recalculating line endpoints\n";
+  for (auto& line3D : lines3D_) {
+    RecalculateEndpoints(*this, &line3D.second);
+  }
+    std::cerr << "Recalculated line endpoints\n";
 }
 
 std::vector<image_t> Reconstruction::FilterImages(
@@ -1642,6 +1661,62 @@ size_t Reconstruction::FilterPoints3DWithLargeReprojectionError(
     }
   }
 
+  return num_filtered;
+}
+
+size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
+    std::cerr << "Filtering lines\n";
+  const double max_reproj_error = 10;
+  // Number of filtered lines.
+  size_t num_filtered = 0;
+
+  std::vector<line3D_t> lines_to_delete;
+  
+  for (auto& line3D_pair : lines3D_) {
+    class Line3D& line3D = line3D_pair.second;
+    if (line3D.Track().Length() < 2) {
+      num_filtered += line3D.Track().Length();
+      lines_to_delete.push_back(line3D_pair.first);
+      continue;
+    }
+
+    double reproj_error_sum = 0.0;
+
+    std::vector<TrackElement> track_els_to_delete;
+
+    for (const auto& track_el : line3D.Track().Elements()) {
+      const class Image& image = Image(track_el.image_id);
+      const class Camera& camera = Camera(image.CameraId());
+      const Line2D& line2D = image.Line2D(track_el.point2D_idx);
+      Eigen::Vector2d reprojErr =
+          LineReprojectionCost(camera, image, line2D, line3D);
+      if (reprojErr.x() > max_reproj_error ||
+          reprojErr.y() > max_reproj_error ||
+          !CheckLineOverlap(camera, image, line2D, line3D)) {
+        track_els_to_delete.push_back(track_el);
+      } else {
+        reproj_error_sum += reprojErr.x();
+        reproj_error_sum += reprojErr.y();
+      }
+    }
+
+    if (track_els_to_delete.size() >= line3D.Track().Length() - 1) {
+      num_filtered += line3D.Track().Length();
+      lines_to_delete.push_back(line3D_pair.first);
+    } else {
+      num_filtered += track_els_to_delete.size();
+      for (const auto& track_el : track_els_to_delete) {
+        DeleteLineObservation(track_el.image_id, track_el.point2D_idx);
+      }
+      line3D.SetError(reproj_error_sum / 2 / line3D.Track().Length());
+    }
+  }
+
+  for (const line3D_t line_id : lines_to_delete) {
+      DeleteLine3D(line_id);
+  }
+  
+  std::cerr << "Filtered " << num_filtered << " line observations\n";
   return num_filtered;
 }
 

@@ -604,6 +604,8 @@ void IncrementalMapperController::Reconstruct(
         reconstruction.NumPoints3D() != ba_prev_num_points) {
       IterativeGlobalRefinement(*options_, &mapper);
     }
+    std::cerr << "Filter time\n";
+    FilterPoints(*options_, &mapper); //extra step
 
     // If the total number of images is small then do not enforce the minimum
     // model size so that we can reconstruct small image collections.
@@ -618,6 +620,7 @@ void IncrementalMapperController::Reconstruct(
     } else {
       const bool kDiscardReconstruction = false;
       mapper.EndReconstruction(kDiscardReconstruction);
+      std::cerr << "Successfully ended reconstruction\n";
     }
 
     Callback(LAST_IMAGE_REG_CALLBACK);

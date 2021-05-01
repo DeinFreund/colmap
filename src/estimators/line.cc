@@ -61,6 +61,53 @@ Eigen::Vector2d WorldPointToImage(const Camera& cam, const Image& img,
   }
 }
 
+/**
+ * Calculates intersection point of a plane with a line
+ */
+Eigen::Vector3d IntersectLineWithPlane(const Eigen::Vector3d& line_point,
+                                       const Eigen::Vector3d& line_direction,
+                                       const Eigen::Vector3d& plane_point,
+                                       const Eigen::Vector3d& plane_normal) {
+  const double distance = plane_normal.dot(line_point - plane_point);
+  return line_point - line_direction.normalized() * distance /
+                          plane_normal.dot(line_direction.normalized());
+}
+
+/**
+ * Returns the closest point to the target line on the source line.
+ */
+Eigen::Vector3d ClosestPointToLineOnLine(
+    const Eigen::Vector3d& source_line_point,
+    const Eigen::Vector3d& source_line_direction,
+    const Eigen::Vector3d& target_line_point,
+    const Eigen::Vector3d& target_line_direction) {
+  const Eigen::Vector3d normal =
+      target_line_direction
+          .cross(target_line_direction.cross(source_line_direction))
+          .normalized();
+  return IntersectLineWithPlane(source_line_point, source_line_direction,
+                                target_line_point, normal);
+}
+
+}  // namespace
+
+namespace colmap {
+
+bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d) {
+
+    const double min_line_overlap = 0.7;
+    
+
+    const Eigen::Vector3d line_dir = line3d.XYZ2() - line3d.XYZ1();
+    const Eigen::Vector3d img_pt1 = ImagePointToWorld(cam, img, line2d.XY1());
+    const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
+    const Eigen::Vector3d img_dir1 = img_pt1 - img.ProjectionCenter();
+    const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
+    const Eigen::Vector3d line_pt1 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt1, img_dir1);
+    const Eigen::Vector3d line_pt2 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt2, img_dir2);
+    return (line_pt1 - line_pt2).norm() / line3d.Length() > min_line_overlap;
+}
+
 Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
                                      const Line2D& line2D,
                                      const Line3D& line3D) {
@@ -82,19 +129,6 @@ Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
   return result;
 }
 
-Eigen::Vector3d IntersectLineWithPlane(const Eigen::Vector3d& line_point,
-                                       const Eigen::Vector3d& line_direction,
-                                       const Eigen::Vector3d& plane_point,
-                                       const Eigen::Vector3d& plane_normal) {
-  const double distance = plane_normal.dot(line_point - plane_point);
-  return line_point - line_direction.normalized() * distance /
-                          plane_normal.dot(line_direction.normalized());
-}
-
-}  // namespace
-
-namespace colmap {
-
 Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
                       const Line2D& line1, const Camera& cam2,
                       const Image& img2, const Line2D& line2) {
@@ -111,7 +145,6 @@ Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
 
   if (plane_normal1.dot(plane_normal2) > 0.999) {
     // Ill-formed problem, planes are nearly parallel
-    std::cerr << "got bad " << plane_normal1 << " . " << plane_normal2 << "\n";
     return {};
   }
 
@@ -131,11 +164,9 @@ Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
                              img1.ProjectionCenter(), plane_normal1);
   for (size_t i = 0; i < 4; i++) {
     if (!HasPointPositiveDepth(img1.ProjectionMatrix(), line3D_pts[i])) {
-      std::cerr << "Point " << i << " is behind camera 1\n";
       return {};
     }
     if (!HasPointPositiveDepth(img2.ProjectionMatrix(), line3D_pts[i])) {
-      std::cerr << "Point " << i << " is behind camera 2\n";
       return {};
     }
   }
@@ -147,25 +178,64 @@ Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
               return line3D_dir.dot(l - line3D_pts[0]) <
                      line3D_dir.dot(r - line3D_pts[0]);
             });
-  return Line3D(std::move(line3D_pts[0]), std::move(line3D_pts[3]));
+  Line3D line3d(std::move(line3D_pts[0]), std::move(line3D_pts[3]));
+  if (!CheckLineOverlap(cam1, img1, line1, line3d) || !CheckLineOverlap(cam2, img2, line2, line3d)) {
+      return {};
+  }
+  return line3d;
+}
+
+void RecalculateEndpoints(const Reconstruction& reconstruction,
+                          Line3D* const linePtr) {
+  Line3D& line = *linePtr;
+  CHECK(line.Track().Length() >= 2);
+
+  const Eigen::Vector3d line_dir = line.XYZ2() - line.XYZ1();
+  std::vector<Eigen::Vector3d> points3d;
+  for (const auto& track_el : line.Track().Elements()) {
+    const Image& img = reconstruction.Image(track_el.image_id);
+    const Camera& cam = reconstruction.Camera(img.CameraId());
+    const Line2D& line2d = img.Line2D(track_el.point2D_idx);
+    const Eigen::Vector3d img_pt1 = ImagePointToWorld(cam, img, line2d.XY1());
+    const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
+    const Eigen::Vector3d img_dir1 = img_pt1 - img.ProjectionCenter();
+    const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
+    points3d.push_back(ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt1, img_dir1));
+    points3d.push_back(ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt2, img_dir2));
+  }
+
+  std::sort(
+      points3d.begin(), points3d.end(), [&](const auto& l, const auto& r) {
+        return line_dir.dot(l - line.XYZ1()) < line_dir.dot(r - line.XYZ1());
+      });
+/*  std::cerr << "Updated line from \n"
+            << line.XYZ1() << " -> \n"
+            << line.XYZ2() << " to \n"
+            << points3d[0] << " -> \n"
+            << points3d.back() << "\n";*/
+  line.SetXYZ(points3d[0], points3d.back());
 }
 
 line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D) {
   const double max_reproj_err = 4;
   double min_reproj_err = std::numeric_limits<double>::max();
   line2D_t best_line2D_idx = kInvalidLine2DIdx;
-  
+
   for (line2D_t line2D_idx = 0; line2D_idx < img.NumLines2D(); ++line2D_idx) {
     const Line2D& test_line = img.Line2D(line2D_idx);
 
     if (!HasPointPositiveDepth(img.ProjectionMatrix(), line3D.XYZ1())) {
-        continue;
+      continue;
     }
     if (!HasPointPositiveDepth(img.ProjectionMatrix(), line3D.XYZ2())) {
+      continue;
+    }
+    if (test_line.HasLine3D()) {
+      continue;  // alternatively check if new match would be better
+    }
+    if (!CheckLineOverlap(cam, img, test_line, line3D)) {
         continue;
     }
-    if (test_line.HasLine3D())
-      continue;  // alternatively check if new match would be better
     Eigen::Vector2d reprojErr =
         LineReprojectionCost(cam, img, test_line, line3D);
     if (reprojErr.x() < max_reproj_err && reprojErr.y() < max_reproj_err &&
@@ -185,9 +255,12 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
             << img2.NumLines2D() << " " << test_image.NumLines2D() << "\n";
   std::list<Line3D> result;
 
-  // Observed lines for each 2D line, since each 2D line can only be associated to one 3d line, this is used to select the best candidate.
-  // There's one map of candidates for each of the three images
-  std::vector<std::map<line2D_t, std::map<double, std::reference_wrapper<Line3D>>>> trackCandidates(3);
+  // Observed lines for each 2D line, since each 2D line can only be associated
+  // to one 3d line, this is used to select the best candidate. There's one map
+  // of candidates for each of the three images
+  std::vector<
+      std::map<line2D_t, std::map<double, std::reference_wrapper<Line3D>>>>
+      trackCandidates(3);
   for (line2D_t line2D_idx1 = 0; line2D_idx1 < img1.NumLines2D();
        ++line2D_idx1) {
     for (line2D_t line2D_idx2 = 0; line2D_idx2 < img2.NumLines2D();
@@ -195,8 +268,7 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
       const Line2D& line1 = img1.Line2D(line2D_idx1);
       const Line2D& line2 = img2.Line2D(line2D_idx2);
 
-      Line3D line3D =
-          EstimateLine3D(cam1, img1, line1, cam2, img2, line2);
+      Line3D line3D = EstimateLine3D(cam1, img1, line1, cam2, img2, line2);
       if (line3D.Length() < 1e-6) {
         continue;
       }
@@ -206,6 +278,9 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
       for (line2D_t line2D_idx3 = 0; line2D_idx3 < test_image.NumLines2D();
            ++line2D_idx3) {
         const Line2D& test_line = test_image.Line2D(line2D_idx3);
+        if (!CheckLineOverlap(test_camera, test_image, test_line, line3D)) {
+            continue;
+        }
         Eigen::Vector2d reprojErr1 =
             LineReprojectionCost(cam1, img1, line1, line3D);
         CHECK_LT(reprojErr1.norm(), 1e-4);
@@ -218,19 +293,21 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
         if (reprojErr.x() < max_reproj_err && reprojErr.y() < max_reproj_err) {
           result.push_back(std::move(line3D));
           result.back().SetError(reprojErr.norm());
-          trackCandidates[0][line2D_idx1].emplace(reprojErr.norm(),
+          result.back().Track().AddElement(img1.ImageId(), line2D_idx1);
+          result.back().Track().AddElement(img2.ImageId(), line2D_idx2);
+          result.back().Track().AddElement(test_image.ImageId(), line2D_idx3);
+          /*trackCandidates[0][line2D_idx1].emplace(reprojErr.norm(),
                                                   result.back());
           trackCandidates[1][line2D_idx2].emplace(reprojErr.norm(),
                                                   result.back());
           trackCandidates[2][line2D_idx3].emplace(reprojErr.norm(),
-                                                  result.back());
-          std::cerr << "confirmed line from " << line3D.XYZ1() << " to "
-                    << line3D.XYZ2() << "\n";
+          result.back());*/
           break;
         }
       }
     }
   }
+  /*
   for (const auto& candidate : trackCandidates[0]) {
     if (img1.Line2D(candidate.first).HasLine3D())
       continue;  // alternatively check if new match would be better
@@ -249,7 +326,7 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
     candidate.second.begin()->second.get().Track().AddElement(
         test_image.ImageId(), candidate.first);
   }
-
+  */
   std::vector<Line3D> lines3D;
   const auto isConstrained = [](const Line3D& line) {
     return line.Track().Length() > 1;

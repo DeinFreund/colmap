@@ -382,6 +382,7 @@ void DatabaseImageViewerWidget::ShowImageWithId(const image_t image_id) {
                  std::back_inserter(lines), [](const auto& line) {
                    return LineSegment{.start = line.XY1(), .end = line.XY2()};
                  });
+  std::cout << "Showing " << lines.size() << " lines\n";
 
   const std::string path = JoinPaths(*options_->image_path, image.Name());
   ReadAndShowWithKeypoints(path, keypoints, lines, tri_mask);
