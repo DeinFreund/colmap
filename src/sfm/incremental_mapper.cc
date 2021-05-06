@@ -511,7 +511,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
 
   for (const auto& line : reconstruction_->Lines3D()) {
     const point2D_t matched_idx =
-        MatchLine(camera, image, line.second);
+    MatchLine(camera, image, line.second, *reconstruction_);
     if (matched_idx != kInvalidLine2DIdx) {
       reconstruction_->AddLineObservation(line.first, image.ImageId(),
                                           matched_idx);
@@ -535,7 +535,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
 
   std::cerr << "kept " << candidates.size() << " candidates\n";
   std::vector<Line3D> added_lines;
-  if (candidates.size() >= 4) {
+  if (candidates.size() >= 2) {
     const CorrespondenceGraph& correspondence_graph =
         database_cache_->CorrespondenceGraph();
     const Image& second_image = reconstruction_->Image(candidates[0]);

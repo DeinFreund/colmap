@@ -49,6 +49,7 @@ Image::Image()
       camera_id_(kInvalidCameraId),
       registered_(false),
       num_points3D_(0),
+      num_lines3D_(0),
       num_observations_(0),
       num_correspondences_(0),
       num_visible_points3D_(0),

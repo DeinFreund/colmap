@@ -93,11 +93,9 @@ Eigen::Vector3d ClosestPointToLineOnLine(
 
 namespace colmap {
 
-bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d) {
-
-    const double min_line_overlap = 0.7;
-    
-
+// Projects the two endpoints of the 2d line onto the 3d line
+// Returns their position as distance along the line
+std::pair<double, double> ProjectOnLine(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d) {
     const Eigen::Vector3d line_dir = line3d.XYZ2() - line3d.XYZ1();
     const Eigen::Vector3d img_pt1 = ImagePointToWorld(cam, img, line2d.XY1());
     const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
@@ -105,7 +103,44 @@ bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d,
     const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
     const Eigen::Vector3d line_pt1 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt1, img_dir1);
     const Eigen::Vector3d line_pt2 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt2, img_dir2);
-    return (line_pt1 - line_pt2).norm() / line3d.Length() > min_line_overlap;
+    std::pair<double, double> res{(line_pt1 - line3d.XYZ1()).dot(line_dir.normalized()), (line_pt2 - line3d.XYZ1()).dot(line_dir.normalized())};
+    if (res.first > res.second) {
+      std::swap(res.first, res.second);
+    }
+    return res;
+}
+
+bool CheckLineOverlap(const Camera& cam1, const Image& img1, const Line2D& line2d1, const Camera& cam2, const Image& img2, const Line2D& line2d2, const Line3D& line3d) {
+  const double min_line_overlap = 0.7;
+
+  const std::pair<double, double> line_points =
+      ProjectOnLine(cam1, img1, line2d1, line3d);
+  const std::pair<double, double> track_points =
+      ProjectOnLine(cam2, img2, line2d2, line3d);
+  const double overlap = (std::min(line_points.second, track_points.second) -
+                          std::max(line_points.first, track_points.first)) /
+                         std::max(line_points.second - line_points.first,
+                                  track_points.second - track_points.first);
+  //std::cerr << "got1 " << line_points.first << " -> " << line_points.second << "\n";
+  //std::cerr << "got2 " << track_points.first << " -> " << track_points.second << "\n";
+  //std::cerr <<"overlap is " << overlap << "\n";
+  CHECK_LT(overlap, 1.0);
+  return overlap > min_line_overlap;
+}
+
+bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d, const Reconstruction& reconstruction) {
+
+    for (const auto& track_el : line3d.Track().Elements()) {
+        if (track_el.image_id == img.ImageId()) continue;
+      const class Image& image = reconstruction.Image(track_el.image_id);
+      const class Camera& camera = reconstruction.Camera(image.CameraId());
+      const Line2D& track_line = image.Line2D(track_el.point2D_idx);
+      if (CheckLineOverlap(cam, img, line2d, camera, image, track_line, line3d)) {
+          return true;
+      }
+    }
+
+    return false;
 }
 
 Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
@@ -179,7 +214,7 @@ Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
                      line3D_dir.dot(r - line3D_pts[0]);
             });
   Line3D line3d(std::move(line3D_pts[0]), std::move(line3D_pts[3]));
-  if (!CheckLineOverlap(cam1, img1, line1, line3d) || !CheckLineOverlap(cam2, img2, line2, line3d)) {
+  if (!CheckLineOverlap(cam1, img1, line1, cam2, img2, line2, line3d)) {
       return {};
   }
   return line3d;
@@ -216,7 +251,7 @@ void RecalculateEndpoints(const Reconstruction& reconstruction,
   line.SetXYZ(points3d[0], points3d.back());
 }
 
-line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D) {
+line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D, const Reconstruction& reconstruction) {
   const double max_reproj_err = 4;
   double min_reproj_err = std::numeric_limits<double>::max();
   line2D_t best_line2D_idx = kInvalidLine2DIdx;
@@ -233,7 +268,7 @@ line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D) {
     if (test_line.HasLine3D()) {
       continue;  // alternatively check if new match would be better
     }
-    if (!CheckLineOverlap(cam, img, test_line, line3D)) {
+    if (!CheckLineOverlap(cam, img, test_line, line3D, reconstruction)) {
         continue;
     }
     Eigen::Vector2d reprojErr =
@@ -278,7 +313,7 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
       for (line2D_t line2D_idx3 = 0; line2D_idx3 < test_image.NumLines2D();
            ++line2D_idx3) {
         const Line2D& test_line = test_image.Line2D(line2D_idx3);
-        if (!CheckLineOverlap(test_camera, test_image, test_line, line3D)) {
+        if (!CheckLineOverlap(test_camera, test_image, test_line, cam1, img1, line1, line3D) && !CheckLineOverlap(test_camera, test_image, test_line, cam2, img2, line2, line3D)) {
             continue;
         }
         Eigen::Vector2d reprojErr1 =

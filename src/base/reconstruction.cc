@@ -1692,7 +1692,7 @@ size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
           LineReprojectionCost(camera, image, line2D, line3D);
       if (reprojErr.x() > max_reproj_error ||
           reprojErr.y() > max_reproj_error ||
-          !CheckLineOverlap(camera, image, line2D, line3D)) {
+          !CheckLineOverlap(camera, image, line2D, line3D, *this)) {
         track_els_to_delete.push_back(track_el);
       } else {
         reproj_error_sum += reprojErr.x();
