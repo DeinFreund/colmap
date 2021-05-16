@@ -124,23 +124,24 @@ bool CheckLineOverlap(const Camera& cam1, const Image& img1, const Line2D& line2
   //std::cerr << "got1 " << line_points.first << " -> " << line_points.second << "\n";
   //std::cerr << "got2 " << track_points.first << " -> " << track_points.second << "\n";
   //std::cerr <<"overlap is " << overlap << "\n";
-  CHECK_LT(overlap, 1.0);
+  assert(overlap < 1.0);
   return overlap > min_line_overlap;
 }
 
-bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d, const Reconstruction& reconstruction) {
-
-    for (const auto& track_el : line3d.Track().Elements()) {
-        if (track_el.image_id == img.ImageId()) continue;
-      const class Image& image = reconstruction.Image(track_el.image_id);
-      const class Camera& camera = reconstruction.Camera(image.CameraId());
-      const Line2D& track_line = image.Line2D(track_el.point2D_idx);
-      if (CheckLineOverlap(cam, img, line2d, camera, image, track_line, line3d)) {
-          return true;
-      }
+bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d,
+                      const Line3D& line3d,
+                      const Reconstruction& reconstruction) {
+  for (const auto& track_el : line3d.Track().Elements()) {
+    if (track_el.image_id == img.ImageId()) continue;
+    const class Image& image = reconstruction.Image(track_el.image_id);
+    const class Camera& camera = reconstruction.Camera(image.CameraId());
+    const Line2D& track_line = image.Line2D(track_el.point2D_idx);
+    if (CheckLineOverlap(cam, img, line2d, camera, image, track_line, line3d)) {
+      return true;
     }
+  }
 
-    return false;
+  return false;
 }
 
 Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
