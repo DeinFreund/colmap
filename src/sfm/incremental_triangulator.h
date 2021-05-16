@@ -101,6 +101,10 @@ class IncrementalTriangulator {
   // in the associated reconstruction.
   size_t TriangulateImage(const Options& options, const image_t image_id);
 
+  // Triangulate lines between pairs of images. 
+  size_t TriangulateLines(const Options& options, const image_t image_id,
+                          std::vector<image_t> candidates);
+
   // Complete triangulations for image. Tries to create new tracks for not
   // yet triangulated observations and tries to complete existing tracks.
   // Returns the number of completed observations.
@@ -144,6 +148,16 @@ class IncrementalTriangulator {
   // Clear the collection of changed 3D points.
   void ClearModifiedPoints3D();
 
+
+  // Indicate that a 3D line has been modified.
+  void AddModifiedLine3D(const line3D_t line3D_id);
+
+  // Get changed 3D lines, since the last call to `ClearModifiedLines3D`.
+  const std::unordered_set<line3D_t>& GetModifiedLines3D();
+
+  // Clear the collection of changed 3D lines.
+  void ClearModifiedLines3D();
+    
   // Data for a correspondence / element of a track, used to store all
   // relevant data for triangulation, in order to avoid duplicate lookup
   // in the underlying unordered_map's in the Reconstruction
@@ -201,6 +215,10 @@ class IncrementalTriangulator {
   // Changed 3D points, i.e. if a 3D point is modified (created, continued,
   // deleted, merged, etc.). Cleared once `ModifiedPoints3D` is called.
   std::unordered_set<point3D_t> modified_point3D_ids_;
+    
+  // Changed 3D lines, i.e. if a 3D line is modified (created, continued,
+  // deleted, merged, etc.). Cleared once `ModifiedLines3D` is called.
+  std::unordered_set<line3D_t> modified_line3D_ids_;
 };
 
 }  // namespace colmap

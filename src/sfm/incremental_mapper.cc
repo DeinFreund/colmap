@@ -515,122 +515,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     if (matched_idx != kInvalidLine2DIdx) {
       reconstruction_->AddLineObservation(line.first, image.ImageId(),
                                           matched_idx);
-      modified_line3D_ids_.insert(line.first);
-    }
-  }
-
-  // Find a good triplet for line reconstruction
-
-  std::cerr << "finding triplet\n";
-  std::vector<image_t> candidates =
-      FindSecondInitialImage(options, image.ImageId(), true);
-
-  std::cerr << "got " << candidates.size() << " candidates\n";
-  candidates.erase(
-      std::remove_if(candidates.begin(), candidates.end(),
-                     [&](const image_t& id) {
-                       return !reconstruction_->Image(id).IsRegistered();
-                     }),
-      candidates.end());
-
-  std::cerr << "kept " << candidates.size() << " candidates\n";
-  std::vector<Line3D> added_lines;
-  if (candidates.size() >= 2) {
-    const CorrespondenceGraph& correspondence_graph =
-        database_cache_->CorrespondenceGraph();
-    const Image& second_image = reconstruction_->Image(candidates[0]);
-
-    std::cerr << "finding third\n";
-    const Image& third_image = reconstruction_->Image(*std::max_element(
-        candidates.begin() + 1, candidates.end(),
-        [&](const image_t& id1, const image_t& id2) {
-          return std::min(correspondence_graph.NumCorrespondencesBetweenImages(
-                              image.ImageId(), id1),
-                          correspondence_graph.NumCorrespondencesBetweenImages(
-                              second_image.ImageId(), id1)) <
-                 std::min(correspondence_graph.NumCorrespondencesBetweenImages(
-                              image.ImageId(), id2),
-                          correspondence_graph.NumCorrespondencesBetweenImages(
-                              second_image.ImageId(), id2));
-        }));
-
-    Camera& second_camera = reconstruction_->Camera(second_image.ImageId());
-    Camera& third_camera = reconstruction_->Camera(third_image.ImageId());
-
-    // Reconstruct lines 3 times with each permutation of images, then check
-    // which lines were reconstructed 3 times and only use those
-    std::map<std::array<std::pair<image_t, point2D_t>, 3>, uint32_t> track_freq;
-    for (const Line3D& line3D :
-         EstimateLines(third_camera, third_image, camera, image, second_camera,
-                       second_image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      track_freq[key]++;
-    }
-    for (const Line3D& line3D :
-         EstimateLines(second_camera, second_image, third_camera, third_image,
-                       camera, image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      track_freq[key]++;
-    }
-    std::vector<Line3D> candidate_lines;
-    for (const Line3D& line3D :
-         EstimateLines(camera, image, second_camera, second_image, third_camera,
-                       third_image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      if (++track_freq[key] == 3) {
-        candidate_lines.push_back(line3D);
-      }
-    }
-    std::map<std::pair<image_t, line2D_t>, std::map<double, std::reference_wrapper<Line3D>>> track_candidates;
-    for (Line3D& line3D : candidate_lines) {
-        for (const auto& el : line3D.Track().Elements()) {
-            track_candidates[std::make_pair(el.image_id, el.point2D_idx)].emplace(line3D.Error(), line3D);
-        }
-    }
-    for (auto& candidate_pair : track_candidates) {
-        image_t image_id = candidate_pair.first.first;
-        line2D_t line2D_idx = candidate_pair.first.second;
-        auto& candidates = candidate_pair.second;
-        if (reconstruction_->Image(image_id).Line2D(line2D_idx).HasLine3D()) {
-            Line3D& line3D = reconstruction_->Line3D(reconstruction_->Image(image_id).Line2D(line2D_idx).Line3DId());
-            if (line3D.Error() > candidates.begin()->first) {
-                reconstruction_->DeleteLineObservation(image_id, line2D_idx);
-            }else{
-                candidates.emplace(line3D.Error(), line3D);
-            }
-        }
-        for (auto it = std::next(candidates.begin()); it != candidates.end(); ++it) {
-            Line3D& line3D = it->second.get();
-            line3D.Track().DeleteElement(image_id, line2D_idx);
-        }
-    }
-    for (Line3D& line3D : candidate_lines) {
-        if (line3D.Track().Length() >= 2) {
-            std::cerr << "adding line\n";
-            added_lines.push_back(line3D);
-        }
-    }
-    std::cerr << "got candidates ";
-    for (const auto p : track_freq) {
-        if (p.second < 3) continue;
-        std::cerr << '[';
-        for (uint32_t i = 0; i < 3; i++){
-            
-            std::cerr << '{' << p.first[i].first << "," << p.first[i].second << "} ";
-        }
-        std::cerr << ']';
+      triangulator_->AddModifiedLine3D(line.first);
     }
   }
 
@@ -640,11 +525,6 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
 
   reconstruction_->RegisterImage(image_id);
   RegisterImageEvent(image_id);
-
-  for (Line3D& line : added_lines) {
-      const line3D_t line3D_id = reconstruction_->AddLine3D(std::move(line));
-      modified_line3D_ids_.insert(line3D_id);
-  }
   
   for (size_t i = 0; i < inlier_mask.size(); ++i) {
     if (inlier_mask[i]) {
@@ -666,7 +546,8 @@ size_t IncrementalMapper::TriangulateImage(
     const IncrementalTriangulator::Options& tri_options,
     const image_t image_id) {
   CHECK_NOTNULL(reconstruction_);
-  return triangulator_->TriangulateImage(tri_options, image_id);
+  size_t tri_lines = triangulator_->TriangulateLines(tri_options, image_id, FindSecondInitialImage(Options{}, image_id, true));
+  return tri_lines + triangulator_->TriangulateImage(tri_options, image_id);
 }
 
 size_t IncrementalMapper::Retriangulate(
@@ -964,11 +845,11 @@ void IncrementalMapper::ClearModifiedPoints3D() {
 }
 
 const std::unordered_set<line3D_t>& IncrementalMapper::GetModifiedLines3D() {
-    return modified_line3D_ids_;
+  return triangulator_->GetModifiedLines3D();
 }
 
 void IncrementalMapper::ClearModifiedLines3D() {
-    modified_line3D_ids_.clear();
+  triangulator_->ClearModifiedLines3D();
 }
 
 std::vector<image_t> IncrementalMapper::FindFirstInitialImage(

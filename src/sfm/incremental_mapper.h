@@ -312,10 +312,6 @@ class IncrementalMapper {
   // This image list will be non-empty, if the reconstruction is continued from
   // an existing reconstruction.
   std::unordered_set<image_t> existing_image_ids_;
-    
-  // Changed 3D lines, i.e. if a 3D line is modified (created, continued,
-  // deleted, merged, etc.). Cleared once `ModifiedLines3D` is called.
-  std::unordered_set<line3D_t> modified_line3D_ids_;
 
 };
 
