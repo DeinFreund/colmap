@@ -29,6 +29,8 @@ Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
                                      const Line2D& line2D,
                                      const Line3D& line3D);
 
+double LineTriangulationAngle(const Line3D& line3D, const Reconstruction& reconstruction);
+
 }  // namespace colmap
 
 

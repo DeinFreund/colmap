@@ -47,6 +47,13 @@ struct TrackElement {
   image_t image_id;
   // The point in the image that the track element is observed.
   point2D_t point2D_idx;
+
+    bool operator==(const TrackElement& o) const {
+        return o.image_id == image_id && o.point2D_idx == point2D_idx;
+    }
+    bool operator!=(const TrackElement& o) const {
+        return !(o == *this);
+    }
 };
 
 class Track {

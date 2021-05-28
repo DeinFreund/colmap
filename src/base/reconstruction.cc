@@ -197,7 +197,7 @@ point3D_t Reconstruction::AddLine3D(class Line3D line) {
   CHECK(!ExistsLine3D(line3D_id));
 
   for (const auto& track_el : line.Track().Elements()) {
-      std::cerr << "setting line3d for " << track_el.point2D_idx << " to " << line3D_id << "\n";
+      std::cerr << "setting line3d for " << track_el.image_id << ", " << track_el.point2D_idx << " to " << line3D_id << "\n";
     class Image& image = Image(track_el.image_id);
     CHECK(!image.Line2D(track_el.point2D_idx).HasLine3D());
     image.SetLine3DForLine2D(track_el.point2D_idx, line3D_id);
@@ -361,6 +361,8 @@ void Reconstruction::DeleteLineObservation(const image_t image_id,
   CHECK(image.Line2D(line2D_idx).HasLine3D());
   const line3D_t line3D_id = image.Line2D(line2D_idx).Line3DId();
   class Line3D& line3D = Line3D(line3D_id);
+  
+  std::cerr << "deleting line3d for " << image_id << ", " << line2D_idx << " to " << line3D_id << "\n";
 
   if (line3D.Track().Length() <= 2) {
     DeleteLine3D(line3D_id);
@@ -1666,7 +1668,8 @@ size_t Reconstruction::FilterPoints3DWithLargeReprojectionError(
 
 size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
     std::cerr << "Filtering lines\n";
-  const double max_reproj_error = 10;
+  const double max_reproj_error = 4;
+  const double min_tri_angle = 30 * M_PI / 180.0;
   // Number of filtered lines.
   size_t num_filtered = 0;
 
@@ -1674,7 +1677,7 @@ size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
   
   for (auto& line3D_pair : lines3D_) {
     class Line3D& line3D = line3D_pair.second;
-    if (line3D.Track().Length() < 2) {
+    if (line3D.Track().Length() < 2 || LineTriangulationAngle(line3D, *this) < min_tri_angle) {
       num_filtered += line3D.Track().Length();
       lines_to_delete.push_back(line3D_pair.first);
       continue;

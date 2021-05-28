@@ -104,6 +104,63 @@ struct PlaneParameterizationPlus {
     const Eigen::Vector3d normal_;
 };
 
+
+
+// Line endpoint bundle adjustment cost function for variable
+// camera pose and calibration and line parameters.
+template <typename CameraModel>
+class LineEndpointBundleAdjustmentCostFunction {
+ public:
+  explicit LineEndpointBundleAdjustmentCostFunction(const Eigen::Vector2d& pos,
+                                            double line_pos)
+      : observed_x_(pos.x()),
+        observed_y_(pos.y()),
+        line_pos_(line_pos) {
+  }
+
+  static ceres::CostFunction* Create(const Eigen::Vector2d& pos,
+                                     double line_pos) {
+    return (new ceres::AutoDiffCostFunction<
+            LineEndpointBundleAdjustmentCostFunction<CameraModel>, 2, 4, 3, 3, 3,
+            CameraModel::kNumParams>(
+                new LineEndpointBundleAdjustmentCostFunction(pos, line_pos)));
+  }
+
+  template <typename T>
+  bool operator()(const T* const qvec, const T* const tvec,
+                  const T* const point3D1, const T* const point3D2,
+                  const T* const camera_params, T* residuals) const {
+    // Rotate and translate.
+    T projection[3];
+    ceres::UnitQuaternionRotatePoint(qvec, point3D, projection);
+    projection[0] += tvec[0];
+    projection[1] += tvec[1];
+    projection[2] += tvec[2];
+
+    // Project to image plane.
+    projection[0] /= projection[2];
+    projection[1] /= projection[2];
+
+    // Distort and transform to pixel space.
+    CameraModel::WorldToImage(camera_params, projection[0], projection[1],
+                              &residuals[0], &residuals[1]);
+
+    // Re-projection error.
+    residuals[0] -= T(observed_x_);
+    residuals[1] -= T(observed_y_);
+      
+    return true;
+  }
+
+ private:
+    
+  const double observed_x1_;
+  const double observed_y1_;
+  const double observed_x2_;
+  const double observed_y2_;
+};
+
+
 // Standard bundle adjustment cost function for variable
 // camera pose and calibration and line parameters.
 template <typename CameraModel>

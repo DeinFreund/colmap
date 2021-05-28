@@ -178,6 +178,10 @@ class IncrementalMapper {
   size_t TriangulateImage(const IncrementalTriangulator::Options& tri_options,
                           const image_t image_id);
 
+  // Triangulate line observations of image.
+  size_t TriangulateImageLines(const IncrementalTriangulator::Options& tri_options,
+                          const image_t image_id);
+
   // Retriangulate image pairs that should have common observations according to
   // the scene graph but don't due to drift, etc. To handle drift, the employed
   // reprojection error thresholds should be relatively large. If the thresholds

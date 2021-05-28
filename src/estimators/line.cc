@@ -89,6 +89,11 @@ Eigen::Vector3d ClosestPointToLineOnLine(
                                 target_line_point, normal);
 }
 
+Eigen::Vector3d ProjectVectorOntoPlane(const Eigen::Vector3d& vector, const Eigen::Vector3d& plane_normal) {
+    return vector - vector.dot(plane_normal) * plane_normal;
+}
+
+
 }  // namespace
 
 namespace colmap {
@@ -250,6 +255,28 @@ void RecalculateEndpoints(const Reconstruction& reconstruction,
             << points3d[0] << " -> \n"
             << points3d.back() << "\n";*/
   line.SetXYZ(points3d[0], points3d.back());
+}
+
+
+double LineTriangulationAngle(const Line3D& line3D, const Reconstruction& reconstruction) {
+  double maxAngle = 0;
+  const Eigen::Vector3d normal = (line3D.XYZ2() - line3D.XYZ1()).normalized();
+  const Eigen::Vector3d center_point = 0.5 * (line3D.XYZ2() + line3D.XYZ1());
+  for (const auto& track_el : line3D.Track().Elements()) {
+    const Image& img1 = reconstruction.Image(track_el.image_id);
+
+    for (const auto& track_el2 : line3D.Track().Elements()) {
+      if (track_el2.image_id == track_el.image_id) continue;
+      const Image& img2 = reconstruction.Image(track_el2.image_id);
+      const Eigen::Vector3d dir1 = ProjectVectorOntoPlane(
+          center_point - img1.ProjectionCenter(), normal);
+      const Eigen::Vector3d dir2 = ProjectVectorOntoPlane(
+          center_point - img2.ProjectionCenter(), normal);
+      const double angle = std::acos(dir1.normalized().dot(dir2.normalized()));
+      maxAngle = std::max(maxAngle, angle);
+    }
+  }
+  return maxAngle;
 }
 
 line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D, const Reconstruction& reconstruction) {

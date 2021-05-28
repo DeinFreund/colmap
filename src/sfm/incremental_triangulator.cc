@@ -90,110 +90,163 @@ size_t IncrementalTriangulator::TriangulateLines(
   std::cerr << "kept " << candidates.size() << " candidates\n";
   std::vector<Line3D> added_lines;
   if (candidates.size() >= 2) {
-    const CorrespondenceGraph& correspondence_graph = *correspondence_graph_;
-    const Image& second_image = reconstruction_->Image(candidates[0]);
-
-    std::cerr << "finding third\n";
-    const Image& third_image = reconstruction_->Image(*std::max_element(
-        candidates.begin() + 1, candidates.end(),
-        [&](const image_t& id1, const image_t& id2) {
-          return std::min(correspondence_graph.NumCorrespondencesBetweenImages(
-                              image.ImageId(), id1),
-                          correspondence_graph.NumCorrespondencesBetweenImages(
-                              second_image.ImageId(), id1)) <
-                 std::min(correspondence_graph.NumCorrespondencesBetweenImages(
-                              image.ImageId(), id2),
-                          correspondence_graph.NumCorrespondencesBetweenImages(
-                              second_image.ImageId(), id2));
-        }));
+    std::vector<Line3D> candidate_lines;
 
     for (size_t cand2_idx = 0; cand2_idx < candidates.size() - 1; cand2_idx++) {
-        for (size_t cand3_idx = cand2_idx + 1; cand3_idx < candidates.size() - 1; cand3_idx++) {
+      for (size_t cand3_idx = cand2_idx + 1; cand3_idx < candidates.size() - 1;
+           cand3_idx++) {
+        const Image& second_image =
+            reconstruction_->Image(candidates[cand2_idx]);
+        const Image& third_image =
+            reconstruction_->Image(candidates[cand3_idx]);
+        const Camera& second_camera =
+            reconstruction_->Camera(second_image.ImageId());
+        const Camera& third_camera =
+            reconstruction_->Camera(third_image.ImageId());
+        std::map<std::array<std::pair<image_t, point2D_t>, 3>, uint32_t>
+            track_freq;
 
-    
-    Camera& second_camera = reconstruction_->Camera(second_image.ImageId());
-    Camera& third_camera = reconstruction_->Camera(third_image.ImageId());
+        // Reconstruct lines 3 times with each permutation of images, then
+        // check which lines were reconstructed 3 times and only use those
+        for (const Line3D& line3D :
+             EstimateLines(third_camera, third_image, camera, image,
+                           second_camera, second_image)) {
+          std::array<std::pair<image_t, point2D_t>, 3> key;
+          for (uint32_t i = 0; i < 3; i++)
+            key[i] = {line3D.Track().Elements()[i].image_id,
+                      line3D.Track().Elements()[i].point2D_idx};
+          std::sort(key.begin(), key.end());
+          track_freq[key]++;
+        }
+        for (const Line3D& line3D :
+             EstimateLines(second_camera, second_image, third_camera,
+                           third_image, camera, image)) {
+          std::array<std::pair<image_t, point2D_t>, 3> key;
+          for (uint32_t i = 0; i < 3; i++)
+            key[i] = {line3D.Track().Elements()[i].image_id,
+                      line3D.Track().Elements()[i].point2D_idx};
+          std::sort(key.begin(), key.end());
+          track_freq[key]++;
+        }
+        for (const Line3D& line3D :
+             EstimateLines(camera, image, second_camera, second_image,
+                           third_camera, third_image)) {
+          std::array<std::pair<image_t, point2D_t>, 3> key;
+          for (uint32_t i = 0; i < 3; i++)
+            key[i] = {line3D.Track().Elements()[i].image_id,
+                      line3D.Track().Elements()[i].point2D_idx};
+          std::sort(key.begin(), key.end());
+          if (++track_freq[key] >= 3) {
+            candidate_lines.push_back(line3D);
+          }
+        }
 
-    // Reconstruct lines 3 times with each permutation of images, then check
-    // which lines were reconstructed 3 times and only use those
-    std::map<std::array<std::pair<image_t, point2D_t>, 3>, uint32_t> track_freq;
-    for (const Line3D& line3D :
-         EstimateLines(third_camera, third_image, camera, image, second_camera,
-                       second_image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      track_freq[key]++;
-    }
-    for (const Line3D& line3D :
-         EstimateLines(second_camera, second_image, third_camera, third_image,
-                       camera, image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      track_freq[key]++;
-    }
-    std::vector<Line3D> candidate_lines;
-    for (const Line3D& line3D :
-         EstimateLines(camera, image, second_camera, second_image, third_camera,
-                       third_image)) {
-      std::array<std::pair<image_t, point2D_t>, 3> key;
-      for (uint32_t i = 0; i < 3; i++)
-        key[i] = {line3D.Track().Elements()[i].image_id,
-                  line3D.Track().Elements()[i].point2D_idx};
-      std::sort(key.begin(), key.end());
-      if (++track_freq[key] == 3) {
-        candidate_lines.push_back(line3D);
+        std::cerr << "got candidates ";
+        for (const auto& p : track_freq) {
+          if (p.second < 3) continue;
+          std::cerr << '[';
+          for (uint32_t i = 0; i < 3; i++) {
+            std::cerr << '{' << p.first[i].first << "," << p.first[i].second
+                      << "} ";
+          }
+          std::cerr << ']';
+        }
       }
     }
-    std::map<std::pair<image_t, line2D_t>, std::map<double, std::reference_wrapper<Line3D>>> track_candidates;
-    for (Line3D& line3D : candidate_lines) {
-        for (const auto& el : line3D.Track().Elements()) {
-            track_candidates[std::make_pair(el.image_id, el.point2D_idx)].emplace(line3D.Error(), line3D);
+
+    for (size_t test_idx = 0; test_idx < candidates.size(); test_idx++) {
+      const Image& test_image = reconstruction_->Image(candidates[test_idx]);
+      const Camera& test_camera = reconstruction_->Camera(test_image.ImageId());
+      for (Line3D& line3D : candidate_lines) {
+          bool image_already_used = false;
+          for (const auto& el : line3D.Track().Elements()) {
+              if (el.image_id == test_image.ImageId()) {
+                  image_already_used = true;
+              }
+          }
+          if (image_already_used) continue;
+        const point2D_t matched_idx =
+            MatchLine(test_camera, test_image, line3D, *reconstruction_);
+        if (matched_idx != kInvalidLine2DIdx) {
+          line3D.Track().AddElement(test_image.ImageId(), matched_idx);
         }
+      }
     }
+
+    std::map<std::pair<image_t, line2D_t>,
+             std::map<std::pair<size_t, double>, std::reference_wrapper<Line3D>>>
+        track_candidates;
+
+    const double min_tri_angle = 30 * M_PI / 180.0;
+    const auto is_outlier = [&](const Line3D& line3D) {
+      return line3D.Track().Length() < 4 ||
+                                       LineTriangulationAngle(line3D, *reconstruction_) < min_tri_angle;
+    };
+    candidate_lines.erase(std::remove_if(candidate_lines.begin(),
+                                         candidate_lines.end(), is_outlier),
+                          candidate_lines.end());
+    
+    for (Line3D& line3D : candidate_lines) {
+      for (const auto& el : line3D.Track().Elements()) {
+        auto pair = track_candidates[std::make_pair(el.image_id, el.point2D_idx)].emplace(
+            std::make_pair(-line3D.Track().Length(), line3D.Error()), line3D);
+        std::cout << "emplaced for " << &line3D << ": " << el.image_id << ", " << el.point2D_idx << std::endl;
+
+        CHECK(pair.second);
+      }
+    }
+    
     for (auto& candidate_pair : track_candidates) {
-        image_t image_id = candidate_pair.first.first;
-        line2D_t line2D_idx = candidate_pair.first.second;
-        auto& candidates = candidate_pair.second;
-        if (reconstruction_->Image(image_id).Line2D(line2D_idx).HasLine3D()) {
-            Line3D& line3D = reconstruction_->Line3D(reconstruction_->Image(image_id).Line2D(line2D_idx).Line3DId());
-            if (line3D.Error() > candidates.begin()->first) {
-                reconstruction_->DeleteLineObservation(image_id, line2D_idx);
-            }else{
-                candidates.emplace(line3D.Error(), line3D);
+      image_t image_id = candidate_pair.first.first;
+      line2D_t line2D_idx = candidate_pair.first.second;
+      auto& candidates = candidate_pair.second;
+      if (reconstruction_->Image(image_id).Line2D(line2D_idx).HasLine3D()) {
+        Line3D& line3D = reconstruction_->Line3D(
+            reconstruction_->Image(image_id).Line2D(line2D_idx).Line3DId());
+        if (std::make_pair(-line3D.Track().Length(), line3D.Error()) >= candidates.begin()->first) {
+            std::cerr << "replacing " << image_id <<  ", " << line2D_idx << "\n";
+          reconstruction_->DeleteLineObservation(image_id, line2D_idx);
+        } else {
+            std::cerr << "keeping " << image_id <<  ", " << line2D_idx << " " << &line3D << "\n";
+          candidates.emplace(std::make_pair(-line3D.Track().Length(), line3D.Error()), line3D);
+        }
+      }
+      Line3D& bestLine = candidates.begin()->second; 
+      
+      std::cerr << "best is " << &bestLine << "\n";
+      for (auto it = std::next(candidates.begin()); it != candidates.end();
+           ++it) {
+        Line3D& line3D = it->second.get();
+        std::cerr << "Deleting " << image_id <<  ", " << line2D_idx << " " << &line3D << "\n"; 
+        if(&line3D != &bestLine) {}else{
+            for (const auto& el : line3D.Track().Elements()) {
+                std::cout << el.image_id << ", " << el.point2D_idx << std::endl;
             }
+            std::cout << line3D.XYZ1()<< std::endl;
+                std::abort();
         }
-        for (auto it = std::next(candidates.begin()); it != candidates.end(); ++it) {
-            Line3D& line3D = it->second.get();
-            line3D.Track().DeleteElement(image_id, line2D_idx);
-        }
+        line3D.Track().DeleteElement(image_id, line2D_idx);
+      }
+      
+      CHECK_EQ(&bestLine,&candidates.begin()->second.get()); 
     }
+    
     for (Line3D& line3D : candidate_lines) {
-        if (line3D.Track().Length() >= 2) {
-            std::cerr << "adding line\n";
-            added_lines.push_back(line3D);
-        }
+        std::cout << "\nremaining candidate " << &line3D << std::endl;
+      for (const auto& el : line3D.Track().Elements()) {
+        std::cout << "rem for " << &line3D << ": " << el.image_id << ", " << el.point2D_idx << std::endl;
+      }
     }
-    std::cerr << "got candidates ";
-    for (const auto p : track_freq) {
-        if (p.second < 3) continue;
-        std::cerr << '[';
-        for (uint32_t i = 0; i < 3; i++){
-            
-            std::cerr << '{' << p.first[i].first << "," << p.first[i].second << "} ";
-        }
-        std::cerr << ']';
-    }
+    std::move(candidate_lines.begin(), candidate_lines.end(), std::back_inserter(added_lines));
+    added_lines.erase(std::remove_if(added_lines.begin(),
+                                         added_lines.end(), is_outlier),
+                          added_lines.end());
+  
   }
 
   for (Line3D& line : added_lines) {
-      const line3D_t line3D_id = reconstruction_->AddLine3D(std::move(line));
-      modified_line3D_ids_.insert(line3D_id);
+    const line3D_t line3D_id = reconstruction_->AddLine3D(std::move(line));
+    modified_line3D_ids_.insert(line3D_id);
   }
 
   return added_lines.size();

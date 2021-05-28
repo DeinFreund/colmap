@@ -221,7 +221,7 @@ std::vector<image_t> IncrementalMapper::FindNextImages(const Options& options) {
   std::vector<std::pair<image_t, float>> other_image_ranks;
 
   // Append images that have not failed to register before.
-  for (const auto& image : reconstruction_->Images()) {;
+  for (const auto& image : reconstruction_->Images()) {
     // Skip images that are already registered.
     if (image.second.IsRegistered()) {
       continue;
@@ -546,13 +546,23 @@ size_t IncrementalMapper::TriangulateImage(
     const IncrementalTriangulator::Options& tri_options,
     const image_t image_id) {
   CHECK_NOTNULL(reconstruction_);
-  size_t tri_lines = triangulator_->TriangulateLines(tri_options, image_id, FindSecondInitialImage(Options{}, image_id, true));
-  return tri_lines + triangulator_->TriangulateImage(tri_options, image_id);
+  return triangulator_->TriangulateImage(tri_options, image_id);
+}
+
+size_t IncrementalMapper::TriangulateImageLines(
+    const IncrementalTriangulator::Options& tri_options,
+    const image_t image_id) {
+  CHECK_NOTNULL(reconstruction_);
+  return triangulator_->TriangulateLines(tri_options, image_id, FindSecondInitialImage(Options{}, image_id, true));
 }
 
 size_t IncrementalMapper::Retriangulate(
     const IncrementalTriangulator::Options& tri_options) {
   CHECK_NOTNULL(reconstruction_);
+  for (const auto& image : reconstruction_->Images()) {
+      if (!image.second.IsRegistered()) continue;
+      triangulator_->TriangulateLines(tri_options, image.first, FindSecondInitialImage(Options{}, image.first, true));      
+  }
   return triangulator_->Retriangulate(tri_options);
 }
 
