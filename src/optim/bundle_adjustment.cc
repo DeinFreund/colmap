@@ -620,7 +620,7 @@ void BundleAdjuster::AddLineToProblem(const line3D_t line3D_id,
 
     Image& image = reconstruction->Image(track_el.image_id);
     Camera& camera = reconstruction->Camera(image.CameraId());
-    const Line2D& line2D = image.Line2D(track_el.point2D_idx);
+    const Line2D& line2D = image.Line2D(track_el.line2D_idx);
 
     // We do not want to refine the camera of images that are not
     // part of `constant_image_ids_`, `constant_image_ids_`,

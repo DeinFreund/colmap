@@ -58,6 +58,7 @@ COLMAP_ADD_SOURCES(
     scene_clustering.h scene_clustering.cc
     similarity_transform.h similarity_transform.cc
     track.h track.cc
+    line_track.h line_track.cc
     triangulation.h triangulation.cc
     undistortion.h undistortion.cc
     visibility_pyramid.h visibility_pyramid.cc

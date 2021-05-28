@@ -9,6 +9,9 @@
 
 namespace colmap {
 
+double GetLineParameter(const Camera& cam, const Image& img,
+                        const Line3D& line3D, const Eigen::Vector2d& point2D);
+
 bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d, const Reconstruction& reconstruction);
 
 Line3D EstimateLine3D(const Camera& cam1, const Image& img1,

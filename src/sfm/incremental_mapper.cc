@@ -515,6 +515,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     if (matched_idx != kInvalidLine2DIdx) {
       reconstruction_->AddLineObservation(line.first, image.ImageId(),
                                           matched_idx);
+      RecalculateEndpoints(*reconstruction_, &reconstruction_->Line3D(line.first));
       triangulator_->AddModifiedLine3D(line.first);
     }
   }

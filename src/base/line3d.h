@@ -36,7 +36,7 @@
 #include <utility>
 #include <Eigen/Core>
 
-#include "base/track.h"
+#include "base/line_track.h"
 #include "util/logging.h"
 #include "util/types.h"
 
@@ -86,9 +86,9 @@ class Line3D {
   inline bool HasError() const;
   inline void SetError(const double error);
 
-  inline const class Track& Track() const;
-  inline class Track& Track();
-  inline void SetTrack(const class Track& track);
+  inline const class LineTrack& Track() const;
+  inline class LineTrack& Track();
+  inline void SetTrack(const class LineTrack& track);
 
  private:
   // Two points representing the line
@@ -102,7 +102,7 @@ class Line3D {
   double error_;
 
   // The track of the point as a list of image observations.
-  class Track track_;
+  class LineTrack track_;
 };
 
 // Fits a line to a vector of points. The returned endpoints matches the extent of the original points
@@ -164,13 +164,13 @@ bool Line3D::HasError() const { return error_ != -1.0; }
 
 void Line3D::SetError(const double error) { error_ = error; }
 
-const class Track& Line3D::Track() const { return track_; }
+const class LineTrack& Line3D::Track() const { return track_; }
 
-class Track& Line3D::Track() {
+class LineTrack& Line3D::Track() {
   return track_;
 }
 
-void Line3D::SetTrack(const class Track& track) { track_ = track; }
+void Line3D::SetTrack(const class LineTrack& track) { track_ = track; }
 
 }  // namespace colmap
 

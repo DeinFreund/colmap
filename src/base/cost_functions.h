@@ -104,32 +104,32 @@ struct PlaneParameterizationPlus {
     const Eigen::Vector3d normal_;
 };
 
-
-
 // Line endpoint bundle adjustment cost function for variable
 // camera pose and calibration and line parameters.
 template <typename CameraModel>
 class LineEndpointBundleAdjustmentCostFunction {
  public:
   explicit LineEndpointBundleAdjustmentCostFunction(const Eigen::Vector2d& pos,
-                                            double line_pos)
-      : observed_x_(pos.x()),
-        observed_y_(pos.y()),
-        line_pos_(line_pos) {
-  }
+                                                    double line_pos)
+      : observed_x_(pos.x()), observed_y_(pos.y()), line_pos_(line_pos) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector2d& pos,
                                      double line_pos) {
     return (new ceres::AutoDiffCostFunction<
-            LineEndpointBundleAdjustmentCostFunction<CameraModel>, 2, 4, 3, 3, 3,
-            CameraModel::kNumParams>(
-                new LineEndpointBundleAdjustmentCostFunction(pos, line_pos)));
+            LineEndpointBundleAdjustmentCostFunction<CameraModel>, 2, 4, 3, 3,
+            3, CameraModel::kNumParams>(
+        new LineEndpointBundleAdjustmentCostFunction(pos, line_pos)));
   }
 
   template <typename T>
   bool operator()(const T* const qvec, const T* const tvec,
                   const T* const point3D1, const T* const point3D2,
                   const T* const camera_params, T* residuals) const {
+    T point3D[3];
+    point3D[0] = line_pos_ * point3D1[0] + (1 - line_pos_) * point3D2[0];
+    point3D[1] = line_pos_ * point3D1[1] + (1 - line_pos_) * point3D2[1];
+    point3D[2] = line_pos_ * point3D1[2] + (1 - line_pos_) * point3D2[2];
+
     // Rotate and translate.
     T projection[3];
     ceres::UnitQuaternionRotatePoint(qvec, point3D, projection);
@@ -148,18 +148,91 @@ class LineEndpointBundleAdjustmentCostFunction {
     // Re-projection error.
     residuals[0] -= T(observed_x_);
     residuals[1] -= T(observed_y_);
-      
+
     return true;
   }
 
  private:
-    
-  const double observed_x1_;
-  const double observed_y1_;
-  const double observed_x2_;
-  const double observed_y2_;
+  const double observed_x_;
+  const double observed_y_;
+  const double line_pos_;
 };
 
+// Line endpoint bundle adjustment cost function for variable
+// camera pose and calibration and line parameters.
+template <typename CameraModel>
+class LineEndpointConstantPoseBundleAdjustmentCostFunction {
+ public:
+  explicit LineEndpointConstantPoseBundleAdjustmentCostFunction(
+      const Eigen::Vector4d& qvec, const Eigen::Vector3d& tvec,
+      const Eigen::Vector2d& pos, double line_pos)
+
+      : qw_(qvec(0)),
+        qx_(qvec(1)),
+        qy_(qvec(2)),
+        qz_(qvec(3)),
+        tx_(tvec(0)),
+        ty_(tvec(1)),
+        tz_(tvec(2)),
+        observed_x_(pos.x()),
+        observed_y_(pos.y()),
+        line_pos_(line_pos) {}
+
+  static ceres::CostFunction* Create(const Eigen::Vector4d& qvec,
+                                     const Eigen::Vector3d& tvec,
+                                     const Eigen::Vector2d& pos,
+                                     double line_pos) {
+    return (new ceres::AutoDiffCostFunction<
+            LineEndpointConstantPoseBundleAdjustmentCostFunction<CameraModel>,
+            2, 3, 3, CameraModel::kNumParams>(
+        new LineEndpointConstantPoseBundleAdjustmentCostFunction(
+            qvec, tvec, pos, line_pos)));
+  }
+
+  template <typename T>
+  bool operator()(const T* const point3D1, const T* const point3D2,
+                  const T* const camera_params, T* residuals) const {
+    T point3D[3];
+    point3D[0] = line_pos_ * point3D1[0] + (1 - line_pos_) * point3D2[0];
+    point3D[1] = line_pos_ * point3D1[1] + (1 - line_pos_) * point3D2[1];
+    point3D[2] = line_pos_ * point3D1[2] + (1 - line_pos_) * point3D2[2];
+
+    const T qvec[4] = {T(qw_), T(qx_), T(qy_), T(qz_)};
+
+    // Rotate and translate.
+    T projection[3];
+    ceres::UnitQuaternionRotatePoint(qvec, point3D, projection);
+    projection[0] += T(tx_);
+    projection[1] += T(ty_);
+    projection[2] += T(tz_);
+
+    // Project to image plane.
+    projection[0] /= projection[2];
+    projection[1] /= projection[2];
+
+    // Distort and transform to pixel space.
+    CameraModel::WorldToImage(camera_params, projection[0], projection[1],
+                              &residuals[0], &residuals[1]);
+
+    // Re-projection error.
+    residuals[0] -= T(observed_x_);
+    residuals[1] -= T(observed_y_);
+
+    return true;
+  }
+
+ private:
+  const double qw_;
+  const double qx_;
+  const double qy_;
+  const double qz_;
+  const double tx_;
+  const double ty_;
+  const double tz_;
+  const double observed_x_;
+  const double observed_y_;
+  const double line_pos_;
+};
 
 // Standard bundle adjustment cost function for variable
 // camera pose and calibration and line parameters.

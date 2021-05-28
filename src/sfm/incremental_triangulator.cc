@@ -103,7 +103,7 @@ size_t IncrementalTriangulator::TriangulateLines(
             reconstruction_->Camera(second_image.ImageId());
         const Camera& third_camera =
             reconstruction_->Camera(third_image.ImageId());
-        std::map<std::array<std::pair<image_t, point2D_t>, 3>, uint32_t>
+        std::map<std::array<std::pair<image_t, line2D_t>, 3>, uint32_t>
             track_freq;
 
         // Reconstruct lines 3 times with each permutation of images, then
@@ -111,30 +111,30 @@ size_t IncrementalTriangulator::TriangulateLines(
         for (const Line3D& line3D :
              EstimateLines(third_camera, third_image, camera, image,
                            second_camera, second_image)) {
-          std::array<std::pair<image_t, point2D_t>, 3> key;
+          std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
-                      line3D.Track().Elements()[i].point2D_idx};
+                      line3D.Track().Elements()[i].line2D_idx};
           std::sort(key.begin(), key.end());
           track_freq[key]++;
         }
         for (const Line3D& line3D :
              EstimateLines(second_camera, second_image, third_camera,
                            third_image, camera, image)) {
-          std::array<std::pair<image_t, point2D_t>, 3> key;
+          std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
-                      line3D.Track().Elements()[i].point2D_idx};
+                      line3D.Track().Elements()[i].line2D_idx};
           std::sort(key.begin(), key.end());
           track_freq[key]++;
         }
         for (const Line3D& line3D :
              EstimateLines(camera, image, second_camera, second_image,
                            third_camera, third_image)) {
-          std::array<std::pair<image_t, point2D_t>, 3> key;
+          std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
-                      line3D.Track().Elements()[i].point2D_idx};
+                      line3D.Track().Elements()[i].line2D_idx};
           std::sort(key.begin(), key.end());
           if (++track_freq[key] >= 3) {
             candidate_lines.push_back(line3D);
@@ -165,10 +165,11 @@ size_t IncrementalTriangulator::TriangulateLines(
               }
           }
           if (image_already_used) continue;
-        const point2D_t matched_idx =
+        const line2D_t matched_idx =
             MatchLine(test_camera, test_image, line3D, *reconstruction_);
         if (matched_idx != kInvalidLine2DIdx) {
-          line3D.Track().AddElement(test_image.ImageId(), matched_idx);
+            const Line2D& line2D = test_image.Line2D(matched_idx);
+            line3D.Track().AddElement(test_image.ImageId(), matched_idx, GetLineParameter(test_camera, test_image, line3D, line2D.XY1()), GetLineParameter(test_camera, test_image, line3D, line2D.XY2()), false, false);
         }
       }
     }
@@ -188,9 +189,9 @@ size_t IncrementalTriangulator::TriangulateLines(
     
     for (Line3D& line3D : candidate_lines) {
       for (const auto& el : line3D.Track().Elements()) {
-        auto pair = track_candidates[std::make_pair(el.image_id, el.point2D_idx)].emplace(
+        auto pair = track_candidates[std::make_pair(el.image_id, el.line2D_idx)].emplace(
             std::make_pair(-line3D.Track().Length(), line3D.Error()), line3D);
-        std::cout << "emplaced for " << &line3D << ": " << el.image_id << ", " << el.point2D_idx << std::endl;
+        std::cout << "emplaced for " << &line3D << ": " << el.image_id << ", " << el.line2D_idx << std::endl;
 
         CHECK(pair.second);
       }
@@ -220,7 +221,7 @@ size_t IncrementalTriangulator::TriangulateLines(
         std::cerr << "Deleting " << image_id <<  ", " << line2D_idx << " " << &line3D << "\n"; 
         if(&line3D != &bestLine) {}else{
             for (const auto& el : line3D.Track().Elements()) {
-                std::cout << el.image_id << ", " << el.point2D_idx << std::endl;
+                std::cout << el.image_id << ", " << el.line2D_idx << std::endl;
             }
             std::cout << line3D.XYZ1()<< std::endl;
                 std::abort();
@@ -234,7 +235,7 @@ size_t IncrementalTriangulator::TriangulateLines(
     for (Line3D& line3D : candidate_lines) {
         std::cout << "\nremaining candidate " << &line3D << std::endl;
       for (const auto& el : line3D.Track().Elements()) {
-        std::cout << "rem for " << &line3D << ": " << el.image_id << ", " << el.point2D_idx << std::endl;
+        std::cout << "rem for " << &line3D << ": " << el.image_id << ", " << el.line2D_idx << std::endl;
       }
     }
     std::move(candidate_lines.begin(), candidate_lines.end(), std::back_inserter(added_lines));
@@ -245,6 +246,7 @@ size_t IncrementalTriangulator::TriangulateLines(
   }
 
   for (Line3D& line : added_lines) {
+    RecalculateEndpoints(*reconstruction_, &line);
     const line3D_t line3D_id = reconstruction_->AddLine3D(std::move(line));
     modified_line3D_ids_.insert(line3D_id);
   }
