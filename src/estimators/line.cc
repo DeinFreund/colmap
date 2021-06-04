@@ -43,6 +43,7 @@ Eigen::Vector2d WorldPointToImage(const double* const params, const Image& img,
   Eigen::Vector2d point2D;
   point3D = QuaternionRotatePoint(img.Qvec(), point3D);
   point3D += img.Tvec();
+  point3D /= point3D.z();
   CameraModel::WorldToImage(params, point3D.x(), point3D.y(), &point2D.x(),
                             &point2D.y());
   return point2D;
@@ -89,8 +90,9 @@ Eigen::Vector3d ClosestPointToLineOnLine(
                                 target_line_point, normal);
 }
 
-Eigen::Vector3d ProjectVectorOntoPlane(const Eigen::Vector3d& vector, const Eigen::Vector3d& plane_normal) {
-    return vector - vector.dot(plane_normal) * plane_normal;
+Eigen::Vector3d ProjectVectorOntoPlane(const Eigen::Vector3d& vector,
+                                       const Eigen::Vector3d& plane_normal) {
+  return vector - vector.dot(plane_normal) * plane_normal;
 }
 
 /**
@@ -123,22 +125,31 @@ double GetLineParameter(const Camera& cam, const Image& img,
 
 // Projects the two endpoints of the 2d line onto the 3d line
 // Returns their position as distance along the line
-std::pair<double, double> ProjectOnLine(const Camera& cam, const Image& img, const Line2D& line2d, const Line3D& line3d) {
-    const Eigen::Vector3d line_dir = line3d.XYZ2() - line3d.XYZ1();
-    const Eigen::Vector3d img_pt1 = ImagePointToWorld(cam, img, line2d.XY1());
-    const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
-    const Eigen::Vector3d img_dir1 = img_pt1 - img.ProjectionCenter();
-    const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
-    const Eigen::Vector3d line_pt1 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt1, img_dir1);
-    const Eigen::Vector3d line_pt2 = ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt2, img_dir2);
-    std::pair<double, double> res{(line_pt1 - line3d.XYZ1()).dot(line_dir.normalized()), (line_pt2 - line3d.XYZ1()).dot(line_dir.normalized())};
-    if (res.first > res.second) {
-      std::swap(res.first, res.second);
-    }
-    return res;
+std::pair<double, double> ProjectOnLine(const Camera& cam, const Image& img,
+                                        const Line2D& line2d,
+                                        const Line3D& line3d) {
+  const Eigen::Vector3d line_dir = line3d.XYZ2() - line3d.XYZ1();
+  const Eigen::Vector3d img_pt1 = ImagePointToWorld(cam, img, line2d.XY1());
+  const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
+  const Eigen::Vector3d img_dir1 = img_pt1 - img.ProjectionCenter();
+  const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
+  const Eigen::Vector3d line_pt1 =
+      ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt1, img_dir1);
+  const Eigen::Vector3d line_pt2 =
+      ClosestPointToLineOnLine(line3d.XYZ1(), line_dir, img_pt2, img_dir2);
+  std::pair<double, double> res{
+      (line_pt1 - line3d.XYZ1()).dot(line_dir.normalized()),
+      (line_pt2 - line3d.XYZ1()).dot(line_dir.normalized())};
+  if (res.first > res.second) {
+    std::swap(res.first, res.second);
+  }
+  return res;
 }
 
-bool CheckLineOverlap(const Camera& cam1, const Image& img1, const Line2D& line2d1, const Camera& cam2, const Image& img2, const Line2D& line2d2, const Line3D& line3d) {
+bool CheckLineOverlap(const Camera& cam1, const Image& img1,
+                      const Line2D& line2d1, const Camera& cam2,
+                      const Image& img2, const Line2D& line2d2,
+                      const Line3D& line3d) {
   const double min_line_overlap = 0.7;
 
   const std::pair<double, double> line_points =
@@ -149,9 +160,9 @@ bool CheckLineOverlap(const Camera& cam1, const Image& img1, const Line2D& line2
                           std::max(line_points.first, track_points.first)) /
                          std::max(line_points.second - line_points.first,
                                   track_points.second - track_points.first);
-  //std::cerr << "got1 " << line_points.first << " -> " << line_points.second << "\n";
-  //std::cerr << "got2 " << track_points.first << " -> " << track_points.second << "\n";
-  //std::cerr <<"overlap is " << overlap << "\n";
+  // std::cerr << "got1 " << line_points.first << " -> " << line_points.second
+  // << "\n"; std::cerr << "got2 " << track_points.first << " -> " <<
+  // track_points.second << "\n"; std::cerr <<"overlap is " << overlap << "\n";
   assert(overlap < 1.0);
   return overlap > min_line_overlap;
 }
@@ -170,6 +181,29 @@ bool CheckLineOverlap(const Camera& cam, const Image& img, const Line2D& line2d,
   }
 
   return false;
+}
+
+Eigen::Vector2d EndpointReprojectionCost(const Camera& cam, const Image& img,
+                                         const Line2D& line2D,
+                                         const Line3D& line3D,
+                                         const Eigen::Vector2d endpoint,
+                                         double parameter) {
+  Eigen::Vector2d result;
+  switch (cam.ModelId()) {
+#define CAMERA_MODEL_CASE(CameraModel)                                         \
+  case CameraModel::kModelId:                                                  \
+    LineEndpointBundleAdjustmentCostFunction<CameraModel>(endpoint, parameter) \
+        .                                                                      \
+        operator()<double>(img.Qvec().data(), img.Tvec().data(),               \
+                           line3D.XYZ1().data(), line3D.XYZ2().data(),         \
+                           cam.ParamsData(), result.data());                   \
+    break;
+
+    CAMERA_MODEL_SWITCH_CASES
+
+#undef CAMERA_MODEL_CASE
+  }
+  return result;
 }
 
 Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
@@ -244,7 +278,7 @@ Line3D EstimateLine3D(const Camera& cam1, const Image& img1,
             });
   Line3D line3d(std::move(line3D_pts[0]), std::move(line3D_pts[3]));
   if (!CheckLineOverlap(cam1, img1, line1, cam2, img2, line2, line3d)) {
-      return {};
+    return {};
   }
   return line3d;
 }
@@ -256,7 +290,9 @@ void RecalculateEndpoints(const Reconstruction& reconstruction,
 
   const Eigen::Vector3d line_dir = line.XYZ2() - line.XYZ1();
   std::vector<Eigen::Vector3d> points3d, points3d_sorted;
-  for (const auto& track_el : line.Track().Elements()) {
+  for (auto& track_el : line.Track().Elements()) {
+    track_el.fixed_start = false;
+    track_el.fixed_end = false;
     const Image& img = reconstruction.Image(track_el.image_id);
     const Camera& cam = reconstruction.Camera(img.CameraId());
     const Line2D& line2d = img.Line2D(track_el.line2D_idx);
@@ -264,63 +300,152 @@ void RecalculateEndpoints(const Reconstruction& reconstruction,
     const Eigen::Vector3d img_pt2 = ImagePointToWorld(cam, img, line2d.XY2());
     const Eigen::Vector3d img_dir1 = img_pt1 - img.ProjectionCenter();
     const Eigen::Vector3d img_dir2 = img_pt2 - img.ProjectionCenter();
-    points3d.push_back(ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt1, img_dir1));
-    points3d.push_back(ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt2, img_dir2));
+    points3d.push_back(
+        ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt1, img_dir1));
+    points3d.push_back(
+        ClosestPointToLineOnLine(line.XYZ1(), line_dir, img_pt2, img_dir2));
   }
 
   points3d_sorted = points3d;
-  std::sort(
-      points3d_sorted.begin(), points3d_sorted.end(), [&](const auto& l, const auto& r) {
-        return line_dir.dot(l - line.XYZ1()) < line_dir.dot(r - line.XYZ1());
-      });
+  std::sort(points3d_sorted.begin(), points3d_sorted.end(),
+            [&](const auto& l, const auto& r) {
+              return line_dir.dot(l - line.XYZ1()) <
+                     line_dir.dot(r - line.XYZ1());
+            });
   line.SetXYZ(points3d_sorted[0], points3d_sorted.back());
 
   // Maximum error to consider to line endpoints to be matched
-  const double max_match_err = 4;
-  
+  const double max_match_err = 10;
+
   for (uint32_t track_idx = 0; track_idx < line.Track().Length(); track_idx++) {
-      auto& track_el = line.Track().Elements()[track_idx];
-      track_el.start_parameter = GetLineParameter3D(line, points3d[track_idx * 2]);
-      track_el.end_parameter = GetLineParameter3D(line, points3d[track_idx * 2 + 1]);
+    auto& track_el = line.Track().Elements()[track_idx];
+    track_el.start_parameter =
+        GetLineParameter3D(line, points3d[track_idx * 2]);
+    track_el.end_parameter =
+        GetLineParameter3D(line, points3d[track_idx * 2 + 1]);
+  }
 
-      const Image& img = reconstruction.Image(track_el.image_id);
-      const Camera& cam = reconstruction.Camera(img.CameraId());
-      const Line2D& line2d = img.Line2D(track_el.line2D_idx);
-      
-      for (uint32_t track_idx2 = 0; track_idx2 < line.Track().Length(); track_idx2++) {
-          auto& track_el2 = line.Track().Elements()[track_idx2];
-        const Eigen::Vector2d img2_pt1 =
-            WorldPointToImage(cam, img, points3d[track_idx2 * 2]);
-        const Eigen::Vector2d img2_pt2 =
-            WorldPointToImage(cam, img, points3d[track_idx2 * 2 + 1]);
+  std::vector<double> start_averages(line.Track().Length());
+  std::vector<double> end_averages(line.Track().Length());
+  for (uint32_t track_idx = 0; track_idx < line.Track().Length(); track_idx++) {
+    auto& track_el = line.Track().Elements()[track_idx];
+    start_averages[track_idx] = track_el.start_parameter;
+    uint32_t num_start_matches = 1;
+    end_averages[track_idx] = track_el.end_parameter;
+    uint32_t num_end_matches = 1;
 
-        if ((line2d.XY1() - img2_pt1).norm() < max_match_err) {
-            track_el.fixed_start = true;
-            track_el2.fixed_start = true;
-            std::cerr << "Matched start of " << track_el.image_id << " with start of " << track_el2.image_id << "\n";
-        }
-        if ((line2d.XY1() - img2_pt2).norm() < max_match_err) {
-            track_el.fixed_start = true;
-            track_el2.fixed_end = true;
-            std::cerr << "Matched start of " << track_el.image_id << " with end of " << track_el2.image_id << "\n";
-        }
-        if ((line2d.XY2() - img2_pt1).norm() < max_match_err) {
-            track_el.fixed_end = true;
-            track_el2.fixed_start = true;
-            std::cerr << "Matched end of " << track_el.image_id << " with start of " << track_el2.image_id << "\n";
-        }
-        if ((line2d.XY2() - img2_pt2).norm() < max_match_err) {
-            track_el.fixed_end = true;
-            track_el2.fixed_end = true;
-            std::cerr << "Matched end of " << track_el.image_id << " with end of " << track_el2.image_id << "\n";
-        }
-        
+    const Image& img = reconstruction.Image(track_el.image_id);
+    const Camera& cam = reconstruction.Camera(img.CameraId());
+    const Line2D& line2d = img.Line2D(track_el.line2D_idx);
+
+    for (uint32_t track_idx2 = 0; track_idx2 < line.Track().Length();
+         track_idx2++) {
+      auto& track_el2 = line.Track().Elements()[track_idx2];
+      const Eigen::Vector2d img2_pt1 =
+          WorldPointToImage(cam, img, points3d[track_idx2 * 2]);
+      const Eigen::Vector2d img2_pt2 =
+          WorldPointToImage(cam, img, points3d[track_idx2 * 2 + 1]);
+      if (track_idx2 == track_idx) {
+        continue;
       }
+
+      if ((line2d.XY1() - img2_pt1).norm() < max_match_err) {
+        track_el.fixed_start = true;
+        track_el2.fixed_start = true;
+        std::cerr << "Matched start of " << track_el.image_id
+                  << " with start of " << track_el2.image_id << "\n";
+        start_averages[track_idx] += track_el2.start_parameter;
+        num_start_matches ++;
+      }
+      if ((line2d.XY1() - img2_pt2).norm() < max_match_err) {
+        track_el.fixed_start = true;
+        track_el2.fixed_end = true;
+        std::cerr << "Matched start of " << track_el.image_id << " with end of "
+                  << track_el2.image_id << "\n";
+        start_averages[track_idx] += track_el2.end_parameter;
+        num_start_matches ++;
+      }
+      if ((line2d.XY2() - img2_pt1).norm() < max_match_err) {
+        track_el.fixed_end = true;
+        track_el2.fixed_start = true;
+        std::cerr << "Matched end of " << track_el.image_id << " with start of "
+                  << track_el2.image_id << "\n";
+        end_averages[track_idx] += track_el2.start_parameter;
+        num_end_matches ++;
+      }
+      if ((line2d.XY2() - img2_pt2).norm() < max_match_err) {
+        track_el.fixed_end = true;
+        track_el2.fixed_end = true;
+        std::cerr << "Matched end of " << track_el.image_id << " with end of "
+                  << track_el2.image_id << "\n";
+        end_averages[track_idx] += track_el2.end_parameter;
+        num_end_matches ++;
+      }
+    }
+    start_averages[track_idx] /= num_start_matches;
+    end_averages[track_idx] /= num_end_matches;
+  }
+  for (uint32_t track_idx = 0; track_idx < line.Track().Length(); track_idx++) {
+
+    auto& track_el = line.Track().Elements()[track_idx];
+    track_el.start_parameter = start_averages[track_idx];
+    track_el.end_parameter = end_averages[track_idx];
+
+    //BAD
+    /*
+    const double snap_distance = 0.035;
+    if (track_el.start_parameter < snap_distance) {
+        std::cerr << track_el.start_parameter << " => 0\n"; 
+        track_el.start_parameter = 0.0;
+        track_el.fixed_start = true;
+    }
+    if (track_el.start_parameter > 1.0 - snap_distance) {
+        std::cerr << track_el.start_parameter << " => 1\n";
+        track_el.start_parameter = 1.0;
+        track_el.fixed_start = true;
+    }
+    if (track_el.end_parameter < snap_distance) {
+        std::cerr << track_el.end_parameter << " => 0\n";
+        track_el.end_parameter = 0.0;
+        track_el.fixed_end = true;
+    }
+    if (track_el.end_parameter > 1.0 - snap_distance) {
+        std::cerr << track_el.end_parameter << " => 1\n";
+        track_el.end_parameter = 1.0;
+        track_el.fixed_end = true;
+    }
+
+    */
+  }
+
+
+  for (const auto& track_el : line.Track().Elements()) {
+    const Image& img = reconstruction.Image(track_el.image_id);
+    const Camera& cam = reconstruction.Camera(img.CameraId());
+    const Line2D& line2d = img.Line2D(track_el.line2D_idx);
+    std::cerr << "start: "
+              << EndpointReprojectionCost(cam, img, line2d, line, line2d.XY1(),
+                                          track_el.start_parameter)
+                     .norm()
+              << "\n";
+    CHECK_LT(EndpointReprojectionCost(cam, img, line2d, line, line2d.XY1(),
+                                      track_el.start_parameter)
+                 .norm(),
+             30.0);
+    std::cerr << "end: "
+              << EndpointReprojectionCost(cam, img, line2d, line, line2d.XY2(),
+                                          track_el.end_parameter)
+                     .norm()
+              << "\n";
+    CHECK_LT(EndpointReprojectionCost(cam, img, line2d, line, line2d.XY2(),
+                                      track_el.end_parameter)
+                 .norm(),
+             30.0);
   }
 }
 
-
-double LineTriangulationAngle(const Line3D& line3D, const Reconstruction& reconstruction) {
+double LineTriangulationAngle(const Line3D& line3D,
+                              const Reconstruction& reconstruction) {
   double maxAngle = 0;
   const Eigen::Vector3d normal = (line3D.XYZ2() - line3D.XYZ1()).normalized();
   const Eigen::Vector3d center_point = 0.5 * (line3D.XYZ2() + line3D.XYZ1());
@@ -341,7 +466,8 @@ double LineTriangulationAngle(const Line3D& line3D, const Reconstruction& recons
   return maxAngle;
 }
 
-line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D, const Reconstruction& reconstruction) {
+line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D,
+                   const Reconstruction& reconstruction) {
   const double max_reproj_err = 4;
   double min_reproj_err = std::numeric_limits<double>::max();
   line2D_t best_line2D_idx = kInvalidLine2DIdx;
@@ -359,7 +485,7 @@ line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D, co
       continue;  // alternatively check if new match would be better
     }
     if (!CheckLineOverlap(cam, img, test_line, line3D, reconstruction)) {
-        continue;
+      continue;
     }
     Eigen::Vector2d reprojErr =
         LineReprojectionCost(cam, img, test_line, line3D);
@@ -376,8 +502,6 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
                                   const Camera& cam2, const Image& img2,
                                   const Camera& test_camera,
                                   const Image& test_image) {
-  std::cerr << "estimating lines " << img1.NumLines2D() << " "
-            << img2.NumLines2D() << " " << test_image.NumLines2D() << "\n";
   std::list<Line3D> result;
 
   // Observed lines for each 2D line, since each 2D line can only be associated
@@ -403,8 +527,11 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
       for (line2D_t line2D_idx3 = 0; line2D_idx3 < test_image.NumLines2D();
            ++line2D_idx3) {
         const Line2D& test_line = test_image.Line2D(line2D_idx3);
-        if (!CheckLineOverlap(test_camera, test_image, test_line, cam1, img1, line1, line3D) && !CheckLineOverlap(test_camera, test_image, test_line, cam2, img2, line2, line3D)) {
-            continue;
+        if (!CheckLineOverlap(test_camera, test_image, test_line, cam1, img1,
+                              line1, line3D) &&
+            !CheckLineOverlap(test_camera, test_image, test_line, cam2, img2,
+                              line2, line3D)) {
+          continue;
         }
         Eigen::Vector2d reprojErr1 =
             LineReprojectionCost(cam1, img1, line1, line3D);
@@ -418,9 +545,21 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
         if (reprojErr.x() < max_reproj_err && reprojErr.y() < max_reproj_err) {
           result.push_back(std::move(line3D));
           result.back().SetError(reprojErr.norm());
-          result.back().Track().AddElement(img1.ImageId(), line2D_idx1, GetLineParameter(cam1, img1, line3D, line1.XY1()), GetLineParameter(cam1, img1, line3D, line1.XY2()), false, false);
-          result.back().Track().AddElement(img2.ImageId(), line2D_idx2, GetLineParameter(cam2, img2, line3D, line2.XY1()), GetLineParameter(cam2, img2, line3D, line2.XY2()), false, false);
-          result.back().Track().AddElement(test_image.ImageId(), line2D_idx3, GetLineParameter(test_camera, test_image, line3D, test_line.XY1()), GetLineParameter(test_camera, test_image, line3D, test_line.XY2()), false, false);
+          result.back().Track().AddElement(
+              img1.ImageId(), line2D_idx1,
+              GetLineParameter(cam1, img1, line3D, line1.XY1()),
+              GetLineParameter(cam1, img1, line3D, line1.XY2()), false, false);
+          result.back().Track().AddElement(
+              img2.ImageId(), line2D_idx2,
+              GetLineParameter(cam2, img2, line3D, line2.XY1()),
+              GetLineParameter(cam2, img2, line3D, line2.XY2()), false, false);
+          result.back().Track().AddElement(
+              test_image.ImageId(), line2D_idx3,
+              GetLineParameter(test_camera, test_image, line3D,
+                               test_line.XY1()),
+              GetLineParameter(test_camera, test_image, line3D,
+                               test_line.XY2()),
+              false, false);
           /*trackCandidates[0][line2D_idx1].emplace(reprojErr.norm(),
                                                   result.back());
           trackCandidates[1][line2D_idx2].emplace(reprojErr.norm(),

@@ -295,13 +295,13 @@ class LineBundleAdjustmentCostFunction {
 
     // Square distance from line. (can be optimized)
     const auto square = [](T n) { return n * n; };
-    residuals[0] =1e-2 * 
+    residuals[0] =T(1) * 
     ceres::sqrt(
         square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D1[1]) -
                (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D1[0])) /
         (square(T(observed_x2_) - T(observed_x1_)) +
          square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
-    residuals[1] =1e-2 * 
+    residuals[1] = T(1) * 
     ceres::sqrt(
         square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D2[1]) -
                (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D2[0])) /
@@ -394,13 +394,13 @@ class LineBundleAdjustmentConstantPoseCostFunction {
 
     // Square distance from line. (can be optimized)
     const auto square = [](T n) { return n * n; };
-    residuals[0] = 1e-2 * 
+    residuals[0] = T(1) * 
     ceres::sqrt(
         square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D1[1]) -
                (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D1[0])) /
         (square(T(observed_x2_) - T(observed_x1_)) +
          square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
-    residuals[1] =1e-2 * 
+    residuals[1] = T(1) * 
     ceres::sqrt(
         square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D2[1]) -
                (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D2[0])) /

@@ -205,27 +205,16 @@ size_t IncrementalTriangulator::TriangulateLines(
         Line3D& line3D = reconstruction_->Line3D(
             reconstruction_->Image(image_id).Line2D(line2D_idx).Line3DId());
         if (std::make_pair(-line3D.Track().Length(), line3D.Error()) >= candidates.begin()->first) {
-            std::cerr << "replacing " << image_id <<  ", " << line2D_idx << "\n";
           reconstruction_->DeleteLineObservation(image_id, line2D_idx);
         } else {
-            std::cerr << "keeping " << image_id <<  ", " << line2D_idx << " " << &line3D << "\n";
           candidates.emplace(std::make_pair(-line3D.Track().Length(), line3D.Error()), line3D);
         }
       }
       Line3D& bestLine = candidates.begin()->second; 
       
-      std::cerr << "best is " << &bestLine << "\n";
       for (auto it = std::next(candidates.begin()); it != candidates.end();
            ++it) {
         Line3D& line3D = it->second.get();
-        std::cerr << "Deleting " << image_id <<  ", " << line2D_idx << " " << &line3D << "\n"; 
-        if(&line3D != &bestLine) {}else{
-            for (const auto& el : line3D.Track().Elements()) {
-                std::cout << el.image_id << ", " << el.line2D_idx << std::endl;
-            }
-            std::cout << line3D.XYZ1()<< std::endl;
-                std::abort();
-        }
         line3D.Track().DeleteElement(image_id, line2D_idx);
       }
       
@@ -233,10 +222,6 @@ size_t IncrementalTriangulator::TriangulateLines(
     }
     
     for (Line3D& line3D : candidate_lines) {
-        std::cout << "\nremaining candidate " << &line3D << std::endl;
-      for (const auto& el : line3D.Track().Elements()) {
-        std::cout << "rem for " << &line3D << ": " << el.image_id << ", " << el.line2D_idx << std::endl;
-      }
     }
     std::move(candidate_lines.begin(), candidate_lines.end(), std::back_inserter(added_lines));
     added_lines.erase(std::remove_if(added_lines.begin(),
