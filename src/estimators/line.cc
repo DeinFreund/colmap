@@ -209,7 +209,7 @@ Eigen::Vector2d EndpointReprojectionCost(const Camera& cam, const Image& img,
 Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
                                      const Line2D& line2D,
                                      const Line3D& line3D) {
-  Eigen::Vector2d result;
+  Eigen::Vector4d result;
   switch (cam.ModelId()) {
 #define CAMERA_MODEL_CASE(CameraModel)                                        \
   case CameraModel::kModelId:                                                 \
@@ -224,7 +224,7 @@ Eigen::Vector2d LineReprojectionCost(const Camera& cam, const Image& img,
 
 #undef CAMERA_MODEL_CASE
   }
-  return result;
+  return Eigen::Vector2d(Eigen::Vector2d(result[0], result[1]).norm(), Eigen::Vector2d(result[2], result[3]).norm());
 }
 
 Line3D EstimateLine3D(const Camera& cam1, const Image& img1,

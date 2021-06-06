@@ -245,14 +245,12 @@ class LineBundleAdjustmentCostFunction {
         observed_y1_(start.y()),
         observed_x2_(end.x()),
         observed_y2_(end.y()) {
-  
-      //std::cerr << "line goes from \n" << start << " to\n " << end <<"\n";
   }
 
   static ceres::CostFunction* Create(const Eigen::Vector2d& start,
                                      const Eigen::Vector2d& end) {
     return (new ceres::AutoDiffCostFunction<
-            LineBundleAdjustmentCostFunction<CameraModel>, 2, 4, 3, 3, 3,
+            LineBundleAdjustmentCostFunction<CameraModel>, 4, 4, 3, 3, 3,
             CameraModel::kNumParams>(
         new LineBundleAdjustmentCostFunction(start, end)));
   }
@@ -293,23 +291,17 @@ class LineBundleAdjustmentCostFunction {
     CameraModel::WorldToImage(camera_params, projection[0], projection[1],
                               &point2D2[0], &point2D2[1]);
 
-    // Square distance from line. (can be optimized)
-    const auto square = [](T n) { return n * n; };
-    residuals[0] =T(1) * 
-    ceres::sqrt(
-        square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D1[1]) -
-               (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D1[0])) /
-        (square(T(observed_x2_) - T(observed_x1_)) +
-         square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
-    residuals[1] = T(1) * 
-    ceres::sqrt(
-        square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D2[1]) -
-               (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D2[0])) /
-        (square(T(observed_x2_) - T(observed_x1_)) +
-         square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
-
-    
-    //std::cerr << "projection goes from " << point2D1[0] <<" " << point2D1[1] << " to " << point2D2[0] << " " << point2D2[1] <<"\n";
+    // Distance from line
+    //std::cerr << observed_x2_ - observed_x1_ << " " << observed_y2_ - observed_y1_  << "\n";
+    //std::cerr << point2D1[0] - T(observed_x1_) << " " << point2D1[1] - T(observed_y1_)  << "\n"; 
+    const T div = T(1) / (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) + T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
+    const T proj1 = (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) + T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) * div;
+    residuals[0] = point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
+    residuals[1] = point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
+    const T proj2 = ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) + (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) * div;
+    residuals[2] = point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
+    residuals[3] = point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
+    //std::cerr << "residuals: " << residuals[0] << " "  << residuals[1] << " "  << residuals[2] << " "  << residuals[3] << " \n"; 
 
     return true;
   }
@@ -349,7 +341,7 @@ class LineBundleAdjustmentConstantPoseCostFunction {
                                      const Eigen::Vector2d& start,
                                      const Eigen::Vector2d& end) {
     return (new ceres::AutoDiffCostFunction<
-            LineBundleAdjustmentConstantPoseCostFunction<CameraModel>, 2, 3, 3,
+            LineBundleAdjustmentConstantPoseCostFunction<CameraModel>, 4, 3, 3,
             CameraModel::kNumParams>(
                 new LineBundleAdjustmentConstantPoseCostFunction(qvec, tvec, start, end)));
   }
@@ -392,20 +384,14 @@ class LineBundleAdjustmentConstantPoseCostFunction {
     CameraModel::WorldToImage(camera_params, projection[0], projection[1],
                               &point2D2[0], &point2D2[1]);
 
-    // Square distance from line. (can be optimized)
-    const auto square = [](T n) { return n * n; };
-    residuals[0] = T(1) * 
-    ceres::sqrt(
-        square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D1[1]) -
-               (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D1[0])) /
-        (square(T(observed_x2_) - T(observed_x1_)) +
-         square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
-    residuals[1] = T(1) * 
-    ceres::sqrt(
-        square((T(observed_x2_) - T(observed_x1_)) * (T(observed_y1_) - point2D2[1]) -
-               (T(observed_y2_) - T(observed_y1_)) * (T(observed_x1_) - point2D2[0])) /
-        (square(T(observed_x2_) - T(observed_x1_)) +
-         square(T(observed_y2_) - T(observed_y1_))) + T(1e-10));
+    // Distance from line
+    const T div = T(1) / (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) + T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
+    const T proj1 = (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) + T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) * div;
+    residuals[0] = point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
+    residuals[1] = point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
+    const T proj2 = ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) + (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) * div;
+    residuals[2] = point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
+    residuals[3] = point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
     
     return true;
   }
