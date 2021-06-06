@@ -113,6 +113,12 @@ class IncrementalMapper {
     // Minimum triangulation angle in degrees for stable 3D points.
     double filter_min_tri_angle = 1.5;
 
+    // Minimum triangulatoin angle in degrees for 3D lines
+    double line_min_tri_angle_deg = 20.0;
+
+    // Maximum reprojection error for lines in pixels
+    double line_max_reproj_err_px = 4.0;
+
     // Maximum number of trials to register an image.
     int max_reg_trials = 3;
 

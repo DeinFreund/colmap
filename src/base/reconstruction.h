@@ -232,8 +232,8 @@ class Reconstruction {
   // merging the two clouds and their tracks. The coordinate frames of the two
   // reconstructions are aligned using the projection centers of common
   // registered images. Return true if the two reconstructions could be merged.
-  bool Merge(const Reconstruction& reconstruction,
-             const double max_reproj_error);
+  bool Merge(const Reconstruction& reconstruction, double max_reproj_error,
+             double max_line_reproj_error_px);
 
   // Align the given reconstruction with a set of pre-defined camera positions.
   // Assuming that locations[i] gives the 3D coordinates of the center
@@ -266,19 +266,26 @@ class Reconstruction {
   // Filter 3D points with large reprojection error, negative depth, or
   // insufficient triangulation angle.
   //
-  // @param max_reproj_error    The maximum reprojection error.
-  // @param min_tri_angle       The minimum triangulation angle.
-  // @param point3D_ids         The points to be filtered.
+  // @param max_reproj_error         The maximum reprojection error for points.
+  // @param min_tri_angle            The minimum triangulation angle for points.
+  // @param line_max_reproj_error_px The maximum reprojection error for lines in
+  // pixels.
+  // @param line_min_tri_angle_rad   The minimum triangulation angle for lines
+  // in radians.
+  // @param point3D_ids              The points to be filtered.
   //
-  // @return                    The number of filtered observations.
-  size_t FilterPoints3D(const double max_reproj_error,
-                        const double min_tri_angle,
+  // @return                         The number of filtered observations.
+  size_t FilterPoints3D(double max_reproj_error, double min_tri_angle,
+                        double line_max_reproj_error_px,
+                        double line_min_tri_angle_rad,
                         const std::unordered_set<point3D_t>& point3D_ids);
-  size_t FilterPoints3DInImages(const double max_reproj_error,
-                                const double min_tri_angle,
+  size_t FilterPoints3DInImages(double max_reproj_error, double min_tri_angle,
+                                double line_max_reproj_error_px,
+                                double line_min_tri_angle_rad,
                                 const std::unordered_set<image_t>& image_ids);
-  size_t FilterAllPoints3D(const double max_reproj_error,
-                           const double min_tri_angle);
+  size_t FilterAllPoints3D(double max_reproj_error, double min_tri_angle,
+                           double line_max_reproj_error_px,
+                           double line_min_tri_angle_rad);
 
   // Filter observations that have negative depth.
   //
@@ -424,7 +431,7 @@ class Reconstruction {
       const double max_reproj_error,
       const std::unordered_set<point3D_t>& point3D_ids);
 
-  size_t FilterLines3DWithLargeReprojectionError();
+  size_t FilterLines3DWithLargeReprojectionError(double max_reproj_error, double min_tri_angle);
 
   std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>
   ComputeBoundsAndCentroid(const double p0, const double p1,

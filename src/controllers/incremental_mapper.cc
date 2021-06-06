@@ -619,15 +619,21 @@ void IncrementalMapperController::Reconstruct(
     }
 
     // Only run final global BA, if last incremental BA was not global.
-    if (reconstruction.NumRegImages() >= 2 &&
+    if (reconstruction.NumRegImages() >= 2 /*&&
         reconstruction.NumRegImages() != ba_prev_num_reg_images &&
-        reconstruction.NumPoints3D() != ba_prev_num_points) {
+          reconstruction.NumPoints3D() != ba_prev_num_points*/) {
         IterativeGlobalRefinement(*options_, &mapper);
+        /*
         for (image_t image_id : pending_line_tri_image_ids) {
             const Image& image = reconstruction.Image(image_id);
             TriangulateImageLines(*options_, image, &mapper);
         }
         pending_line_tri_image_ids.clear();
+        */
+        for (image_t image_id : reconstruction.RegImageIds()) {
+            const Image& image = reconstruction.Image(image_id);
+            TriangulateImageLines(*options_, image, &mapper);
+        }
         IterativeGlobalRefinement(*options_, &mapper);
     }
     std::cerr << "Filter time\n";

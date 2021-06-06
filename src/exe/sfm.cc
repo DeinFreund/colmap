@@ -306,6 +306,8 @@ int RunPointFiltering(int argc, char** argv) {
   size_t min_track_len = 2;
   double max_reproj_error = 4.0;
   double min_tri_angle = 1.5;
+  double line_max_reproj_err_px = 4.0;
+  double line_min_tri_angle_deg = 20.0;
 
   OptionManager options;
   options.AddRequiredOption("input_path", &input_path);
@@ -313,13 +315,15 @@ int RunPointFiltering(int argc, char** argv) {
   options.AddDefaultOption("min_track_len", &min_track_len);
   options.AddDefaultOption("max_reproj_error", &max_reproj_error);
   options.AddDefaultOption("min_tri_angle", &min_tri_angle);
+  options.AddDefaultOption("line_max_reproj_err_px", &line_max_reproj_err_px);
+  options.AddDefaultOption("line_min_tri_angle_deg", &line_min_tri_angle_deg);
   options.Parse(argc, argv);
 
   Reconstruction reconstruction;
   reconstruction.Read(input_path);
 
   size_t num_filtered =
-      reconstruction.FilterAllPoints3D(max_reproj_error, min_tri_angle);
+  reconstruction.FilterAllPoints3D(max_reproj_error, min_tri_angle, line_max_reproj_err_px, line_min_tri_angle_deg * M_PI / 180.0);
 
   for (const auto point3D_id : reconstruction.Point3DIds()) {
     const auto& point3D = reconstruction.Point3D(point3D_id);

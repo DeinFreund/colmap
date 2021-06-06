@@ -509,17 +509,6 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
     return false;
   }
 
-  for (const auto& line : reconstruction_->Lines3D()) {
-    const point2D_t matched_idx =
-    MatchLine(camera, image, line.second, *reconstruction_);
-    if (matched_idx != kInvalidLine2DIdx) {
-      reconstruction_->AddLineObservation(line.first, image.ImageId(),
-                                          matched_idx);
-      RecalculateEndpoints(*reconstruction_, &reconstruction_->Line3D(line.first));
-      triangulator_->AddModifiedLine3D(line.first);
-    }
-  }
-
   //////////////////////////////////////////////////////////////////////////////
   // Continue tracks
   //////////////////////////////////////////////////////////////////////////////
@@ -554,7 +543,10 @@ size_t IncrementalMapper::TriangulateImageLines(
     const IncrementalTriangulator::Options& tri_options,
     const image_t image_id) {
   CHECK_NOTNULL(reconstruction_);
-  return triangulator_->TriangulateLines(tri_options, image_id, FindSecondInitialImage(Options{}, image_id, true));
+  return triangulator_->MatchLines(tri_options, image_id) +
+         triangulator_->TriangulateLines(
+             tri_options, image_id,
+             FindSecondInitialImage(Options{}, image_id, true));
 }
 
 size_t IncrementalMapper::Retriangulate(
@@ -562,7 +554,7 @@ size_t IncrementalMapper::Retriangulate(
   CHECK_NOTNULL(reconstruction_);
   for (const auto& image : reconstruction_->Images()) {
       if (!image.second.IsRegistered()) continue;
-      triangulator_->TriangulateLines(tri_options, image.first, FindSecondInitialImage(Options{}, image.first, true));      
+      //triangulator_->TriangulateLines(tri_options, image.first, FindSecondInitialImage(Options{}, image.first, true));      
   }
   return triangulator_->Retriangulate(tri_options);
 }
@@ -699,10 +691,10 @@ IncrementalMapper::AdjustLocalBundle(
   filter_image_ids.insert(image_id);
   filter_image_ids.insert(local_bundle.begin(), local_bundle.end());
   report.num_filtered_observations = reconstruction_->FilterPoints3DInImages(
-      options.filter_max_reproj_error, options.filter_min_tri_angle,
+      options.filter_max_reproj_error, options.filter_min_tri_angle, options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0,
       filter_image_ids);
   report.num_filtered_observations += reconstruction_->FilterPoints3D(
-      options.filter_max_reproj_error, options.filter_min_tri_angle,
+      options.filter_max_reproj_error, options.filter_min_tri_angle,options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0,
       point3D_ids);
 
   return report;
@@ -831,7 +823,7 @@ size_t IncrementalMapper::FilterPoints(const Options& options) {
   CHECK_NOTNULL(reconstruction_);
   CHECK(options.Check());
   return reconstruction_->FilterAllPoints3D(options.filter_max_reproj_error,
-                                            options.filter_min_tri_angle);
+                                            options.filter_min_tri_angle,options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0);
 }
 
 const Reconstruction& IncrementalMapper::GetReconstruction() const {

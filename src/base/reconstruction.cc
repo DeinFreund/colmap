@@ -231,6 +231,7 @@ void Reconstruction::AddLineObservation(const line3D_t line3D_id, const image_t 
   class Image& image = Image(image_id);
   class Camera& camera = Camera(image.CameraId());
   CHECK(!image.Line2D(line2D_idx).HasLine3D());
+  CHECK(ExistsLine3D(line3D_id));
 
   image.SetLine3DForLine2D(line2D_idx, line3D_id);
   CHECK_LE(image.NumLines3D(), image.NumLines2D());
@@ -564,7 +565,7 @@ Reconstruction Reconstruction::Crop(
 }
 
 bool Reconstruction::Merge(const Reconstruction& reconstruction,
-                           const double max_reproj_error) {
+                           const double max_reproj_error, const double max_line_reproj_error_px) {
   const double kMinInlierObservations = 0.3;
 
   Eigen::Matrix3x4d alignment;
@@ -685,7 +686,7 @@ bool Reconstruction::Merge(const Reconstruction& reconstruction,
   }
 
   FilterPoints3DWithLargeReprojectionError(max_reproj_error, Point3DIds());
-  FilterLines3DWithLargeReprojectionError();
+  FilterLines3DWithLargeReprojectionError(max_line_reproj_error_px, 0.0);
   RecalculateLineEndpoints();
 
   return true;
@@ -749,22 +750,23 @@ void Reconstruction::TranscribeImageIdsToDatabase(const Database& database) {
 
 size_t Reconstruction::FilterPoints3D(
     const double max_reproj_error, const double min_tri_angle,
+    const double line_max_reproj_error_px, const double line_min_tri_angle_rad,
     const std::unordered_set<point3D_t>& point3D_ids) {
   size_t num_filtered = 0;
   num_filtered +=
       FilterPoints3DWithLargeReprojectionError(max_reproj_error, point3D_ids);
   num_filtered +=
       FilterPoints3DWithSmallTriangulationAngle(min_tri_angle, point3D_ids);
-  num_filtered +=
-      FilterLines3DWithLargeReprojectionError();
-  num_filtered +=
-      FilterObservationsWithNegativeDepth();
+  num_filtered += FilterLines3DWithLargeReprojectionError(
+      line_max_reproj_error_px, line_min_tri_angle_rad);
+  num_filtered += FilterObservationsWithNegativeDepth();
   RecalculateLineEndpoints();
   return num_filtered;
 }
 
 size_t Reconstruction::FilterPoints3DInImages(
     const double max_reproj_error, const double min_tri_angle,
+    const double line_max_reproj_error_px, const double line_min_tri_angle_rad,
     const std::unordered_set<image_t>& image_ids) {
   std::unordered_set<point3D_t> point3D_ids;
   for (const image_t image_id : image_ids) {
@@ -775,16 +777,22 @@ size_t Reconstruction::FilterPoints3DInImages(
       }
     }
   }
-  return FilterPoints3D(max_reproj_error, min_tri_angle, point3D_ids);
+  return FilterPoints3D(max_reproj_error, min_tri_angle,
+                        line_max_reproj_error_px, line_min_tri_angle_rad,
+                        point3D_ids);
 }
 
 size_t Reconstruction::FilterAllPoints3D(const double max_reproj_error,
-                                         const double min_tri_angle) {
+                                         const double min_tri_angle,
+                                         const double line_max_reproj_error_px,
+                                         const double line_min_tri_angle_rad) {
   // Important: First filter observations and points with large reprojection
   // error, so that observations with large reprojection error do not make
   // a point stable through a large triangulation angle.
   const std::unordered_set<point3D_t>& point3D_ids = Point3DIds();
-  return FilterPoints3D(max_reproj_error, min_tri_angle, point3D_ids);
+  return FilterPoints3D(max_reproj_error, min_tri_angle,
+                        line_max_reproj_error_px, line_min_tri_angle_rad,
+                        point3D_ids);
 }
 
 size_t Reconstruction::FilterObservationsWithNegativeDepth() {
@@ -1668,10 +1676,7 @@ size_t Reconstruction::FilterPoints3DWithLargeReprojectionError(
   return num_filtered;
 }
 
-size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
-    std::cerr << "Filtering lines\n";
-  const double max_reproj_error = 4;
-  const double min_tri_angle = 30 * M_PI / 180.0;
+size_t Reconstruction::FilterLines3DWithLargeReprojectionError(double max_reproj_error_px, double min_tri_angle_rad) {
   // Number of filtered lines.
   size_t num_filtered = 0;
 
@@ -1679,7 +1684,7 @@ size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
   
   for (auto& line3D_pair : lines3D_) {
     class Line3D& line3D = line3D_pair.second;
-    if (line3D.Track().Length() < 2 || LineTriangulationAngle(line3D, *this) < min_tri_angle) {
+    if (line3D.Track().Length() < 2 || LineTriangulationAngle(line3D, *this) < min_tri_angle_rad) {
       num_filtered += line3D.Track().Length();
       lines_to_delete.push_back(line3D_pair.first);
       continue;
@@ -1695,8 +1700,8 @@ size_t Reconstruction::FilterLines3DWithLargeReprojectionError() {
       const Line2D& line2D = image.Line2D(track_el.line2D_idx);
       Eigen::Vector2d reprojErr =
           LineReprojectionCost(camera, image, line2D, line3D);
-      if (reprojErr.x() > max_reproj_error ||
-          reprojErr.y() > max_reproj_error ||
+      if (reprojErr.x() > max_reproj_error_px ||
+          reprojErr.y() > max_reproj_error_px ||
           !CheckLineOverlap(camera, image, line2D, line3D, *this)) {
         track_els_to_delete.push_back(track_el);
       } else {

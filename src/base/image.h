@@ -185,6 +185,9 @@ class Image {
   // Check whether one of the image points is part of the 3D point track.
   bool HasPoint3D(const point3D_t point3D_id) const;
 
+  // Check whether one of the image lines is part of the 3D line track.
+  bool HasLine3D(const line3D_t line3D_id) const;
+
   // Indicate that another image has a point that is triangulated and has
   // a correspondence to this image point. Note that this must only be called
   // after calling `SetUp`.

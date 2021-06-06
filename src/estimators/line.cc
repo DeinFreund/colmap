@@ -467,8 +467,7 @@ double LineTriangulationAngle(const Line3D& line3D,
 }
 
 line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D,
-                   const Reconstruction& reconstruction) {
-  const double max_reproj_err = 4;
+                   const Reconstruction& reconstruction, const double max_reproj_err_px) {
   double min_reproj_err = std::numeric_limits<double>::max();
   line2D_t best_line2D_idx = kInvalidLine2DIdx;
 
@@ -489,7 +488,7 @@ line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D,
     }
     Eigen::Vector2d reprojErr =
         LineReprojectionCost(cam, img, test_line, line3D);
-    if (reprojErr.x() < max_reproj_err && reprojErr.y() < max_reproj_err &&
+    if (reprojErr.x() < max_reproj_err_px && reprojErr.y() < max_reproj_err_px &&
         reprojErr.norm() < min_reproj_err) {
       min_reproj_err = reprojErr.norm();
       best_line2D_idx = line2D_idx;
@@ -501,7 +500,7 @@ line2D_t MatchLine(const Camera& cam, const Image& img, const Line3D& line3D,
 std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
                                   const Camera& cam2, const Image& img2,
                                   const Camera& test_camera,
-                                  const Image& test_image) {
+                                  const Image& test_image, const double max_reproj_err) {
   std::list<Line3D> result;
 
   // Observed lines for each 2D line, since each 2D line can only be associated
@@ -522,7 +521,7 @@ std::vector<Line3D> EstimateLines(const Camera& cam1, const Image& img1,
         continue;
       }
 
-      const double max_reproj_err = 4;
+      
 
       for (line2D_t line2D_idx3 = 0; line2D_idx3 < test_image.NumLines2D();
            ++line2D_idx3) {

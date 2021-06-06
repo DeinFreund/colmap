@@ -58,6 +58,50 @@ IncrementalTriangulator::IncrementalTriangulator(
     : correspondence_graph_(correspondence_graph),
       reconstruction_(reconstruction) {}
 
+size_t IncrementalTriangulator::MatchLines(const Options& options,
+                                           const image_t image_id) {
+  CHECK(options.Check());
+
+  const Image& image = reconstruction_->Image(image_id);
+  if (!image.IsRegistered()) {
+    return 0;
+  }
+
+  const Camera& camera = reconstruction_->Camera(image.CameraId());
+  if (HasCameraBogusParams(options, camera)) {
+    return 0;
+  }
+
+  size_t matches = 0;
+  for (const auto& line : reconstruction_->Lines3D()) {
+    const point2D_t matched_idx =
+        MatchLine(camera, image, line.second, *reconstruction_,
+                  options.line_max_match_reproj_error_px);
+    if (matched_idx == kInvalidLine2DIdx) {
+      continue;
+    }
+    if (image.Line2D(matched_idx).HasLine3D()) {
+        std::cerr << "Found existing match\n";
+      const auto& existing_match =
+          reconstruction_->Line3D(image.Line2D(matched_idx).Line3DId());
+      if (existing_match.Track().Length() > line.second.Track().Length() || image.Line2D(matched_idx).Line3DId() == line.first) {
+          continue;
+      }
+        std::cerr << "Replacing existing match\n";
+      reconstruction_->DeleteLineObservation(image_id, matched_idx);
+    }
+        std::cerr << "Matched line\n";
+    reconstruction_->AddLineObservation(line.first, image.ImageId(),
+                                        matched_idx);
+    RecalculateEndpoints(*reconstruction_,
+                         &reconstruction_->Line3D(line.first));
+    AddModifiedLine3D(line.first);
+    matches++;
+  }
+
+  return matches;
+}
+
 size_t IncrementalTriangulator::TriangulateLines(
     const Options& options, const image_t image_id,
     std::vector<image_t> candidates) {
@@ -110,7 +154,7 @@ size_t IncrementalTriangulator::TriangulateLines(
         // check which lines were reconstructed 3 times and only use those
         for (const Line3D& line3D :
              EstimateLines(third_camera, third_image, camera, image,
-                           second_camera, second_image)) {
+                           second_camera, second_image, options.line_max_construct_reproj_error_px)) {
           std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
@@ -120,7 +164,7 @@ size_t IncrementalTriangulator::TriangulateLines(
         }
         for (const Line3D& line3D :
              EstimateLines(second_camera, second_image, third_camera,
-                           third_image, camera, image)) {
+                           third_image, camera, image, options.line_max_construct_reproj_error_px)) {
           std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
@@ -130,7 +174,7 @@ size_t IncrementalTriangulator::TriangulateLines(
         }
         for (const Line3D& line3D :
              EstimateLines(camera, image, second_camera, second_image,
-                           third_camera, third_image)) {
+                           third_camera, third_image, options.line_max_construct_reproj_error_px)) {
           std::array<std::pair<image_t, line2D_t>, 3> key;
           for (uint32_t i = 0; i < 3; i++)
             key[i] = {line3D.Track().Elements()[i].image_id,
@@ -166,7 +210,7 @@ size_t IncrementalTriangulator::TriangulateLines(
           }
           if (image_already_used) continue;
         const line2D_t matched_idx =
-            MatchLine(test_camera, test_image, line3D, *reconstruction_);
+        MatchLine(test_camera, test_image, line3D, *reconstruction_, options.line_max_construct_reproj_error_px);
         if (matched_idx != kInvalidLine2DIdx) {
             const Line2D& line2D = test_image.Line2D(matched_idx);
             line3D.Track().AddElement(test_image.ImageId(), matched_idx, GetLineParameter(test_camera, test_image, line3D, line2D.XY1()), GetLineParameter(test_camera, test_image, line3D, line2D.XY2()), false, false);
@@ -221,8 +265,6 @@ size_t IncrementalTriangulator::TriangulateLines(
       CHECK_EQ(&bestLine,&candidates.begin()->second.get()); 
     }
     
-    for (Line3D& line3D : candidate_lines) {
-    }
     std::move(candidate_lines.begin(), candidate_lines.end(), std::back_inserter(added_lines));
     added_lines.erase(std::remove_if(added_lines.begin(),
                                          added_lines.end(), is_outlier),

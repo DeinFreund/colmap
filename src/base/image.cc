@@ -140,6 +140,13 @@ bool Image::HasPoint3D(const point3D_t point3D_id) const {
                       }) != points2D_.end();
 }
 
+bool Image::HasLine3D(const line3D_t line3D_id) const {
+  return std::find_if(lines2D_.begin(), lines2D_.end(),
+                      [line3D_id](const class Line2D& line2D) {
+                        return line2D.Line3DId() == line3D_id;
+                      }) != lines2D_.end();
+}
+
 void Image::IncrementCorrespondenceHasPoint3D(const point2D_t point2D_idx) {
   const class Point2D& point2D = points2D_.at(point2D_idx);
 

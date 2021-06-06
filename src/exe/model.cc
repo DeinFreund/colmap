@@ -352,6 +352,7 @@ int RunModelMerger(int argc, char** argv) {
   std::string input_path2;
   std::string output_path;
   double max_reproj_error = 64.0;
+  double max_line_reproj_error = 64.0;
 
   OptionManager options;
   options.AddRequiredOption("input_path1", &input_path1);
@@ -377,7 +378,7 @@ int RunModelMerger(int argc, char** argv) {
             << std::endl;
 
   PrintHeading2("Merging reconstructions");
-  if (reconstruction1.Merge(reconstruction2, max_reproj_error)) {
+  if (reconstruction1.Merge(reconstruction2, max_reproj_error, max_line_reproj_error)) {
     std::cout << "=> Merge succeeded" << std::endl;
     PrintHeading2("Merged reconstruction");
     std::cout << StringPrintf("Images: %d", reconstruction1.NumRegImages())

@@ -58,6 +58,12 @@ class IncrementalTriangulator {
     // Maximum reprojection error to complete an existing triangulation.
     double complete_max_reproj_error = 4.0;
 
+    // Maximum reprojection error to construct lines.
+    double line_max_construct_reproj_error_px = 4.0;
+
+    // Maximum reprojection error to match lines.
+    double line_max_match_reproj_error_px = 4.0;
+
     // Maximum transitivity for track completion.
     int complete_max_transitivity = 5;
 
@@ -100,6 +106,9 @@ class IncrementalTriangulator {
   // Note that the given image must be registered and its pose must be set
   // in the associated reconstruction.
   size_t TriangulateImage(const Options& options, const image_t image_id);
+
+  // Match an image with existing 3d lines
+  size_t MatchLines(const Options& options, const image_t image_id);
 
   // Triangulate lines between pairs of images. 
   size_t TriangulateLines(const Options& options, const image_t image_id,
