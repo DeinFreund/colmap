@@ -32,9 +32,9 @@
 #ifndef COLMAP_SRC_BASE_LINE3D_H_
 #define COLMAP_SRC_BASE_LINE3D_H_
 
-#include <vector>
-#include <utility>
 #include <Eigen/Core>
+#include <utility>
+#include <vector>
 
 #include "base/line_track.h"
 #include "util/logging.h"
@@ -45,7 +45,8 @@ namespace colmap {
 // The 3D line class represents a triangulated line
 // Note that while this represents a potentially infinite line in 3D
 // we represent it in terms of 2 3D points. These points are coincide with
-// the maximally observed extent of the line (i.e. union of all 2d line segments)
+// the maximally observed extent of the line (i.e. union of all 2d line
+// segments)
 class Line3D {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -56,7 +57,7 @@ class Line3D {
          Eigen::Vector3ub color = Eigen::Vector3ub(0, 0, 0),
          double error = -1.0);
 
-  // The point coordinate in world space.  
+  // The point coordinate in world space.
   inline const Eigen::Vector3d& XYZ1() const;
   inline const Eigen::Vector3d& XYZ2() const;
   inline Eigen::Vector3d& XYZ1();
@@ -72,8 +73,8 @@ class Line3D {
   inline double Y2() const;
   inline double Z2() const;
   inline void SetXYZ(const Eigen::Vector3d& xyz1, const Eigen::Vector3d& xyz2);
-    inline double Length() const;
-  
+  inline double Length() const;
+
   // The RGB color of the point.
   inline const Eigen::Vector3ub& Color() const;
   inline Eigen::Vector3ub& Color();
@@ -105,17 +106,22 @@ class Line3D {
   class LineTrack track_;
 };
 
-// Fits a line to a vector of points. The returned endpoints matches the extent of the original points
-std::pair<Eigen::Vector3d, Eigen::Vector3d> FitLineToPoints(const std::vector<Eigen::Vector3d> &points);
+// Fits a line to a vector of points. The returned endpoints matches the extent
+// of the original points
+std::pair<Eigen::Vector3d, Eigen::Vector3d> FitLineToPoints(
+    const std::vector<Eigen::Vector3d>& points);
 
 // Projects a point to a line
-Eigen::Vector3d ProjectPointToLine(const Eigen::Vector3d &point, const std::pair<Eigen::Vector3d, Eigen::Vector3d> &line);
+Eigen::Vector3d ProjectPointToLine(
+    const Eigen::Vector3d& point,
+    const std::pair<Eigen::Vector3d, Eigen::Vector3d>& line);
 
 // Finds the parameter for the convex combination of the end points, i.e.
 //        t * X1 + (1-t) * X2 = projection
 // thus if t \in [0,1], we have a point inside the current line segment
-double ProjectPointToLineParameter(const Eigen::Vector3d &point, const std::pair<Eigen::Vector3d, Eigen::Vector3d> &line);
-
+double ProjectPointToLineParameter(
+    const Eigen::Vector3d& point,
+    const std::pair<Eigen::Vector3d, Eigen::Vector3d>& line);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation
@@ -142,8 +148,8 @@ double Line3D::Y2() const { return xyz2_.y(); }
 double Line3D::Z2() const { return xyz2_.z(); }
 
 void Line3D::SetXYZ(const Eigen::Vector3d& xyz1, const Eigen::Vector3d& xyz2) {
-   xyz1_ = xyz1;
-   xyz2_ = xyz2;
+  xyz1_ = xyz1;
+  xyz2_ = xyz2;
 }
 
 double Line3D::Length() const { return (xyz1_ - xyz2_).norm(); }

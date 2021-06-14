@@ -649,7 +649,7 @@ bool PureImageUndistorter::Undistort(const size_t image_idx) const {
   Camera undistorted_camera;
   UndistortImage(options_, distorted_bitmap, camera, &undistorted_bitmap,
                  &undistorted_camera);
-    
+
   return undistorted_bitmap.Write(output_image_path);
 }
 

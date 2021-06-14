@@ -34,6 +34,8 @@
 namespace colmap {
 
 Line2D::Line2D()
-    : xy1_(Eigen::Vector2d::Zero()), xy2_(Eigen::Vector2d::Zero()), line3D_id_(kInvalidPoint3DId) {}
+    : xy1_(Eigen::Vector2d::Zero()),
+      xy2_(Eigen::Vector2d::Zero()),
+      line3D_id_(kInvalidPoint3DId) {}
 
 }  // namespace colmap

@@ -36,10 +36,24 @@ namespace colmap {
 LineTrack::LineTrack() {}
 
 LineTrackElement::LineTrackElement()
-    : image_id(kInvalidImageId), line2D_idx(kInvalidLine2DIdx), start_parameter(std::numeric_limits<double>::quiet_NaN()), end_parameter(std::numeric_limits<double>::quiet_NaN()), fixed_start(false), fixed_end(false) {}
+    : image_id(kInvalidImageId),
+      line2D_idx(kInvalidLine2DIdx),
+      start_parameter(std::numeric_limits<double>::quiet_NaN()),
+      end_parameter(std::numeric_limits<double>::quiet_NaN()),
+      fixed_start(false),
+      fixed_end(false) {}
 
-LineTrackElement::LineTrackElement(const image_t image_id_, const line2D_t line2D_idx_, double start_parameter_, double end_parameter_, bool fixed_start_, bool fixed_end_)
-    : image_id(image_id_), line2D_idx(line2D_idx_), start_parameter(start_parameter_), end_parameter(end_parameter_), fixed_start(fixed_start_), fixed_end(fixed_end_) {}
+LineTrackElement::LineTrackElement(const image_t image_id_,
+                                   const line2D_t line2D_idx_,
+                                   double start_parameter_,
+                                   double end_parameter_, bool fixed_start_,
+                                   bool fixed_end_)
+    : image_id(image_id_),
+      line2D_idx(line2D_idx_),
+      start_parameter(start_parameter_),
+      end_parameter(end_parameter_),
+      fixed_start(fixed_start_),
+      fixed_end(fixed_end_) {}
 
 void LineTrack::DeleteElement(const LineTrackElement& el) {
   elements_.erase(std::remove_if(elements_.begin(), elements_.end(),

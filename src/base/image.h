@@ -165,12 +165,11 @@ class Image {
   void SetLines2D(const std::vector<class Line2D>& lines);
 
   // Set the line as triangulated, i.e. it is part of a 3D line track.
-  void SetLine3DForLine2D(const line2D_t line2D_idx,
-                            const line3D_t line3D_id);
+  void SetLine3DForLine2D(const line2D_t line2D_idx, const line3D_t line3D_id);
 
   // Set the line as not triangulated, i.e. it is not part of a 3D line track.
   void ResetLine3DForLine2D(const line2D_t line2D_idx);
-    
+
   // Set the point as triangulated, i.e. it is part of a 3D point track.
   void SetPoint3DForPoint2D(const point2D_t point2D_idx,
                             const point3D_t point3D_id);
@@ -401,7 +400,6 @@ class Line2D& Image::Line2D(const line2D_t line2D_idx) {
 }
 
 const std::vector<class Line2D>& Image::Lines2D() const { return lines2D_; }
-
 
 bool Image::IsPoint3DVisible(const point2D_t point2D_idx) const {
   return num_correspondences_have_point3D_.at(point2D_idx) > 0;

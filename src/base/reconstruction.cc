@@ -45,7 +45,9 @@
 namespace colmap {
 
 Reconstruction::Reconstruction()
-    : correspondence_graph_(nullptr), num_added_points3D_(0),num_added_lines3D_(0) {}
+    : correspondence_graph_(nullptr),
+      num_added_points3D_(0),
+      num_added_lines3D_(0) {}
 
 std::unordered_set<point3D_t> Reconstruction::Point3DIds() const {
   std::unordered_set<point3D_t> point3D_ids;
@@ -191,13 +193,11 @@ point3D_t Reconstruction::AddPoint3D(const Eigen::Vector3d& xyz,
   return point3D_id;
 }
 
-
 point3D_t Reconstruction::AddLine3D(class Line3D line) {
   const line3D_t line3D_id = ++num_added_lines3D_;
   CHECK(!ExistsLine3D(line3D_id));
 
   for (const auto& track_el : line.Track().Elements()) {
-      std::cerr << "setting line3d for " << track_el.image_id << ", " << track_el.line2D_idx << " to " << line3D_id << "\n";
     class Image& image = Image(track_el.image_id);
     CHECK(!image.Line2D(track_el.line2D_idx).HasLine3D());
     image.SetLine3DForLine2D(track_el.line2D_idx, line3D_id);
@@ -207,7 +207,6 @@ point3D_t Reconstruction::AddLine3D(class Line3D line) {
   lines3D_.emplace(line3D_id, std::move(line));
   return line3D_id;
 }
-
 
 void Reconstruction::AddObservation(const point3D_t point3D_id,
                                     const TrackElement& track_el) {
@@ -225,9 +224,9 @@ void Reconstruction::AddObservation(const point3D_t point3D_id,
                                kIsContinuedPoint3D);
 }
 
-void Reconstruction::AddLineObservation(const line3D_t line3D_id, const image_t image_id,
+void Reconstruction::AddLineObservation(const line3D_t line3D_id,
+                                        const image_t image_id,
                                         const line2D_t line2D_idx) {
-    
   class Image& image = Image(image_id);
   class Camera& camera = Camera(image.CameraId());
   CHECK(!image.Line2D(line2D_idx).HasLine3D());
@@ -238,7 +237,10 @@ void Reconstruction::AddLineObservation(const line3D_t line3D_id, const image_t 
 
   class Line3D& line3D = Line3D(line3D_id);
   const Line2D& line2D = image.Line2D(line2D_idx);
-  line3D.Track().AddElement(image_id, line2D_idx, GetLineParameter(camera, image, line3D, line2D.XY1()), GetLineParameter(camera, image, line3D, line2D.XY2()), false, false);
+  line3D.Track().AddElement(
+      image_id, line2D_idx,
+      GetLineParameter(camera, image, line3D, line2D.XY1()),
+      GetLineParameter(camera, image, line3D, line2D.XY2()), false, false);
 }
 
 point3D_t Reconstruction::MergePoints3D(const point3D_t point3D_id1,
@@ -295,7 +297,10 @@ line3D_t Reconstruction::MergeLines3D(const line3D_t line3D_id1,
   DeleteLine3D(line3D_id1);
   DeleteLine3D(line3D_id2);
 
-  class Line3D merged_line3D(merged_xyz1, merged_xyz2, Eigen::Vector3ub(std::lround(merged_rgb.x()), std::lround(merged_rgb.y()), std::lround(merged_rgb.z())));
+  class Line3D merged_line3D(
+      merged_xyz1, merged_xyz2,
+      Eigen::Vector3ub(std::lround(merged_rgb.x()), std::lround(merged_rgb.y()),
+                       std::lround(merged_rgb.z())));
   merged_line3D.SetTrack(merged_track);
   const line3D_t merged_line3D_id = AddLine3D(std::move(merged_line3D));
 
@@ -324,7 +329,6 @@ void Reconstruction::DeletePoint3D(const point3D_t point3D_id) {
 }
 
 void Reconstruction::DeleteLine3D(const line3D_t line3D_id) {
-
   const class LineTrack& track = Line3D(line3D_id).Track();
 
   for (const auto& track_el : track.Elements()) {
@@ -358,14 +362,12 @@ void Reconstruction::DeleteObservation(const image_t image_id,
 }
 
 void Reconstruction::DeleteLineObservation(const image_t image_id,
-                                       const line2D_t line2D_idx) {
+                                           const line2D_t line2D_idx) {
   CHECK(ExistsImage(image_id));
   class Image& image = Image(image_id);
   CHECK(image.Line2D(line2D_idx).HasLine3D());
   const line3D_t line3D_id = image.Line2D(line2D_idx).Line3DId();
   class Line3D& line3D = Line3D(line3D_id);
-  
-  std::cerr << "deleting line3d for " << image_id << ", " << line2D_idx << " to " << line3D_id << "\n";
 
   if (line3D.Track().Length() <= 2) {
     DeleteLine3D(line3D_id);
@@ -376,7 +378,6 @@ void Reconstruction::DeleteLineObservation(const image_t image_id,
 
   image.ResetLine3DForLine2D(line2D_idx);
 }
-
 
 void Reconstruction::DeleteAllPoints2DAndPoints3D() {
   points3D_.clear();
@@ -565,7 +566,8 @@ Reconstruction Reconstruction::Crop(
 }
 
 bool Reconstruction::Merge(const Reconstruction& reconstruction,
-                           const double max_reproj_error, const double max_line_reproj_error_px) {
+                           const double max_reproj_error,
+                           const double max_line_reproj_error_px) {
   const double kMinInlierObservations = 0.3;
 
   Eigen::Matrix3x4d alignment;
@@ -796,7 +798,6 @@ size_t Reconstruction::FilterAllPoints3D(const double max_reproj_error,
 }
 
 size_t Reconstruction::FilterObservationsWithNegativeDepth() {
-    std::cerr << "Filtering observations with negative depth\n";
   size_t num_filtered = 0;
   for (const auto image_id : reg_image_ids_) {
     const class Image& image = Image(image_id);
@@ -817,7 +818,6 @@ size_t Reconstruction::FilterObservationsWithNegativeDepth() {
       const Line2D& line2D = image.Line2D(line2D_idx);
       if (line2D.HasLine3D()) {
         const class Line3D& line3D = Line3D(line2D.Line3DId());
-        std::cerr << "checking line with len " << line3D.Length() << "\n";
         if (!HasPointPositiveDepth(proj_matrix, line3D.XYZ1()) ||
             !HasPointPositiveDepth(proj_matrix, line3D.XYZ2())) {
           DeleteLineObservation(image_id, line2D_idx);
@@ -826,21 +826,19 @@ size_t Reconstruction::FilterObservationsWithNegativeDepth() {
       }
     }
   }
-  for (auto & line3d : lines3D_) {
-      for (auto& el : line3d.second.Track().Elements()){
-          CHECK_EQ(Image(el.image_id).Line2D(el.line2D_idx).Line3DId(), line3d.first);
-      }
+  for (auto& line3d : lines3D_) {
+    for (auto& el : line3d.second.Track().Elements()) {
+      CHECK_EQ(Image(el.image_id).Line2D(el.line2D_idx).Line3DId(),
+               line3d.first);
+    }
   }
   return num_filtered;
 }
 
 void Reconstruction::RecalculateLineEndpoints() {
-    
-    std::cerr << "Recalculating line endpoints\n";
   for (auto& line3D : lines3D_) {
     RecalculateEndpoints(*this, &line3D.second);
   }
-    std::cerr << "Recalculated line endpoints\n";
 }
 
 std::vector<image_t> Reconstruction::FilterImages(
@@ -969,7 +967,6 @@ std::vector<PlyPoint> Reconstruction::ConvertToPLY() const {
   return ply_points;
 }
 
-
 std::vector<PlyPoint> Reconstruction::ConvertLineEndpointsToPLY() const {
   std::vector<PlyPoint> ply_points;
   ply_points.reserve(2 * lines3D_.size());
@@ -994,7 +991,6 @@ std::vector<PlyPoint> Reconstruction::ConvertLineEndpointsToPLY() const {
 
   return ply_points;
 }
-
 
 void Reconstruction::ImportPLY(const std::string& path) {
   points3D_.clear();
@@ -1711,15 +1707,17 @@ size_t Reconstruction::FilterPoints3DWithLargeReprojectionError(
   return num_filtered;
 }
 
-size_t Reconstruction::FilterLines3DWithLargeReprojectionError(double max_reproj_error_px, double min_tri_angle_rad) {
+size_t Reconstruction::FilterLines3DWithLargeReprojectionError(
+    double max_reproj_error_px, double min_tri_angle_rad) {
   // Number of filtered lines.
   size_t num_filtered = 0;
 
   std::vector<line3D_t> lines_to_delete;
-  
+
   for (auto& line3D_pair : lines3D_) {
     class Line3D& line3D = line3D_pair.second;
-    if (line3D.Track().Length() < 2 || LineTriangulationAngle(line3D, *this) < min_tri_angle_rad) {
+    if (line3D.Track().Length() < 2 ||
+        LineTriangulationAngle(line3D, *this) < min_tri_angle_rad) {
       num_filtered += line3D.Track().Length();
       lines_to_delete.push_back(line3D_pair.first);
       continue;
@@ -1758,10 +1756,9 @@ size_t Reconstruction::FilterLines3DWithLargeReprojectionError(double max_reproj
   }
 
   for (const line3D_t line_id : lines_to_delete) {
-      DeleteLine3D(line_id);
+    DeleteLine3D(line_id);
   }
-  
-  std::cerr << "Filtered " << num_filtered << " line observations\n";
+
   return num_filtered;
 }
 
@@ -2104,12 +2101,11 @@ void Reconstruction::ReadPoints3DBinary(const std::string& path) {
   }
 }
 
-
 void Reconstruction::ReadLines3DBinary(const std::string& path) {
   std::ifstream file(path, std::ios::binary);
   if (!file.is_open()) {
-      std::cerr << "No line data found.\n";
-      return;
+    std::cerr << "No line data found.\n";
+    return;
   }
 
   const size_t num_lines3D = ReadBinaryLittleEndian<uint64_t>(&file);
@@ -2138,14 +2134,14 @@ void Reconstruction::ReadLines3DBinary(const std::string& path) {
       const double end_parameter = ReadBinaryLittleEndian<double>(&file);
       const line2D_t fixed_start = ReadBinaryLittleEndian<bool>(&file);
       const line2D_t fixed_end = ReadBinaryLittleEndian<bool>(&file);
-      line3D.Track().AddElement(image_id, line2D_idx, start_parameter, end_parameter, fixed_start, fixed_end);
+      line3D.Track().AddElement(image_id, line2D_idx, start_parameter,
+                                end_parameter, fixed_start, fixed_end);
     }
     line3D.Track().Compress();
 
     lines3D_.emplace(line3D_id, line3D);
   }
 }
-
 
 void Reconstruction::WriteCamerasText(const std::string& path) const {
   std::ofstream file(path, std::ios::trunc);
@@ -2357,7 +2353,6 @@ void Reconstruction::WritePoints3DBinary(const std::string& path) const {
   }
 }
 
-
 void Reconstruction::WriteLines3DBinary(const std::string& path) const {
   std::ofstream file(path, std::ios::trunc | std::ios::binary);
   CHECK(file.is_open()) << path;
@@ -2388,7 +2383,6 @@ void Reconstruction::WriteLines3DBinary(const std::string& path) const {
     }
   }
 }
-
 
 void Reconstruction::SetObservationAsTriangulated(
     const image_t image_id, const point2D_t point2D_idx,

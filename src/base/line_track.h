@@ -42,14 +42,16 @@ namespace colmap {
 // LineTrack class stores all observations of a 3D line.
 struct LineTrackElement {
   LineTrackElement();
-    LineTrackElement(const image_t image_id, const line2D_t line2D_idx, double start_parameter, double end_parameter, bool fixed_start, bool fixed_end);
+  LineTrackElement(const image_t image_id, const line2D_t line2D_idx,
+                   double start_parameter, double end_parameter,
+                   bool fixed_start, bool fixed_end);
   // The image in which the lineTrack element is observed.
   image_t image_id;
   // The line in the image that the lineTrack element is observed.
   line2D_t line2D_idx;
 
-    double start_parameter, end_parameter;
-    bool fixed_start, fixed_end;
+  double start_parameter, end_parameter;
+  bool fixed_start, fixed_end;
 
   bool operator==(const LineTrackElement& o) const {
     return o.image_id == image_id && o.line2D_idx == line2D_idx;
@@ -90,7 +92,7 @@ class LineTrack {
   void DeleteElement(const image_t image_id, const line2D_t line2D_idx) {
     DeleteElement(LineTrackElement(image_id, line2D_idx, 0, 0, false, false));
   }
-    
+
   // Requests that the lineTrack capacity be at least enough to contain the
   // specified number of elements.
   inline void Reserve(const size_t num_elements);
@@ -108,7 +110,9 @@ class LineTrack {
 
 size_t LineTrack::Length() const { return elements_.size(); }
 
-const std::vector<LineTrackElement>& LineTrack::Elements() const { return elements_; }
+const std::vector<LineTrackElement>& LineTrack::Elements() const {
+  return elements_;
+}
 
 std::vector<LineTrackElement>& LineTrack::Elements() { return elements_; }
 
@@ -121,7 +125,9 @@ const LineTrackElement& LineTrack::Element(const size_t idx) const {
   return elements_.at(idx);
 }
 
-LineTrackElement& LineTrack::Element(const size_t idx) { return elements_.at(idx); }
+LineTrackElement& LineTrack::Element(const size_t idx) {
+  return elements_.at(idx);
+}
 
 void LineTrack::SetElement(const size_t idx, const LineTrackElement& element) {
   elements_.at(idx) = element;

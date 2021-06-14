@@ -107,7 +107,8 @@ std::vector<LineSegment> FeatureLineSegmentsFromBlob(
   std::vector<LineSegment> line_segs(static_cast<size_t>(blob.rows()));
   if (blob.cols() == 4) {
     for (FeatureLineSegmentsBlob::Index i = 0; i < blob.rows(); ++i) {
-        line_segs[i] = LineSegment {.start = {blob(i, 0), blob(i, 1)}, .end = {blob(i, 2), blob(i, 3)}};
+      line_segs[i] = LineSegment{.start = {blob(i, 0), blob(i, 1)},
+                                 .end = {blob(i, 2), blob(i, 3)}};
     }
   } else {
     LOG(FATAL) << "Line segment format not supported";
@@ -477,12 +478,14 @@ FeatureKeypoints Database::ReadKeypoints(const image_t image_id) const {
   return FeatureKeypointsFromBlob(blob);
 }
 
-std::vector<LineSegment> Database::ReadLineSegments(const image_t image_id) const {
+std::vector<LineSegment> Database::ReadLineSegments(
+    const image_t image_id) const {
   SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_read_line_segments_, 1, image_id));
 
   const int rc = SQLITE3_CALL(sqlite3_step(sql_stmt_read_line_segments_));
-  const FeatureLineSegmentsBlob blob = ReadDynamicMatrixBlob<FeatureLineSegmentsBlob>(
-      sql_stmt_read_line_segments_, rc, 0);
+  const FeatureLineSegmentsBlob blob =
+      ReadDynamicMatrixBlob<FeatureLineSegmentsBlob>(
+          sql_stmt_read_line_segments_, rc, 0);
 
   SQLITE3_CALL(sqlite3_reset(sql_stmt_read_line_segments_));
 
@@ -718,7 +721,8 @@ void Database::WriteKeypoints(const image_t image_id,
 }
 
 void Database::WriteLineSegments(
-    const image_t image_id, const std::vector<LineSegment>& line_segments) const {
+    const image_t image_id,
+    const std::vector<LineSegment>& line_segments) const {
   const FeatureLineSegmentsBlob blob = FeatureLineSegmentsToBlob(line_segments);
 
   SQLITE3_CALL(sqlite3_bind_int64(sql_stmt_write_line_segments_, 1, image_id));
@@ -1073,7 +1077,7 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_exists_keypoints_, 0));
   sql_stmts_.push_back(sql_stmt_exists_keypoints_);
-  
+
   sql = "SELECT 1 FROM line_segments WHERE image_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_exists_line_segments_, 0));
@@ -1167,7 +1171,7 @@ void Database::PrepareSQLStatements() {
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_read_line_segments_, 0));
   sql_stmts_.push_back(sql_stmt_read_line_segments_);
-  
+
   sql = "SELECT rows, cols, data FROM descriptors WHERE image_id = ?;";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_read_descriptors_, 0));
@@ -1209,7 +1213,9 @@ void Database::PrepareSQLStatements() {
                                   &sql_stmt_write_keypoints_, 0));
   sql_stmts_.push_back(sql_stmt_write_keypoints_);
 
-  sql = "INSERT INTO line_segments(image_id, rows, cols, data) VALUES(?, ?, ?, ?);";
+  sql =
+      "INSERT INTO line_segments(image_id, rows, cols, data) VALUES(?, ?, ?, "
+      "?);";
   SQLITE3_CALL(sqlite3_prepare_v2(database_, sql.c_str(), -1,
                                   &sql_stmt_write_line_segments_, 0));
   sql_stmts_.push_back(sql_stmt_write_line_segments_);

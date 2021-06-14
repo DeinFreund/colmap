@@ -263,7 +263,6 @@ void BundleAdjustmentConfig::RemoveConstantPoint(const point3D_t point3D_id) {
   constant_point3D_ids_.erase(point3D_id);
 }
 
-
 void BundleAdjustmentConfig::AddVariableLine(const line3D_t line3D_id) {
   CHECK(!HasConstantLine(line3D_id));
   variable_line3D_ids_.insert(line3D_id);
@@ -278,13 +277,11 @@ bool BundleAdjustmentConfig::HasLine(const line3D_t line3D_id) const {
   return HasVariableLine(line3D_id) || HasConstantLine(line3D_id);
 }
 
-bool BundleAdjustmentConfig::HasVariableLine(
-    const line3D_t line3D_id) const {
+bool BundleAdjustmentConfig::HasVariableLine(const line3D_t line3D_id) const {
   return variable_line3D_ids_.find(line3D_id) != variable_line3D_ids_.end();
 }
 
-bool BundleAdjustmentConfig::HasConstantLine(
-    const line3D_t line3D_id) const {
+bool BundleAdjustmentConfig::HasConstantLine(const line3D_t line3D_id) const {
   return constant_line3D_ids_.find(line3D_id) != constant_line3D_ids_.end();
 }
 
@@ -295,7 +292,6 @@ void BundleAdjustmentConfig::RemoveVariableLine(const line3D_t line3D_id) {
 void BundleAdjustmentConfig::RemoveConstantLine(const line3D_t line3D_id) {
   constant_line3D_ids_.erase(line3D_id);
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // BundleAdjuster
@@ -488,11 +484,11 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
 
     if (constant_pose) {
       switch (camera.ModelId()) {
-#define CAMERA_MODEL_CASE(CameraModel)                                 \
-  case CameraModel::kModelId:                                          \
-    cost_function =                                                    \
+#define CAMERA_MODEL_CASE(CameraModel)                                     \
+  case CameraModel::kModelId:                                              \
+    cost_function =                                                        \
         LineBundleAdjustmentConstantPoseCostFunction<CameraModel>::Create( \
-            image.Qvec(), image.Tvec(), line2D.XY1(), line2D.XY2());                 \
+            image.Qvec(), image.Tvec(), line2D.XY1(), line2D.XY2());       \
     break;
 
         CAMERA_MODEL_SWITCH_CASES
@@ -542,8 +538,7 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
                                    camera.ParamsData());
       }
     } else {
-
-        switch (camera.ModelId()) {
+      switch (camera.ModelId()) {
 #define CAMERA_MODEL_CASE(CameraModel)                                     \
   case CameraModel::kModelId:                                              \
     cost_function = LineBundleAdjustmentCostFunction<CameraModel>::Create( \
@@ -598,8 +593,6 @@ void BundleAdjuster::AddImageToProblem(const image_t image_id,
       }
     }
 
-    std::cerr << "line " << line2D.Line3DId() << " has length "
-              << line3D.Length() << "\n";
     CHECK_GT(line3D.Length(), 1e-6);
     ceres::LocalParameterization* plane_parameterization =
         new ceres::AutoDiffLocalParameterization<PlaneParameterizationPlus, 3,
@@ -680,10 +673,9 @@ void BundleAdjuster::AddPointToProblem(const point3D_t point3D_id,
   }
 }
 
-
 void BundleAdjuster::AddLineToProblem(const line3D_t line3D_id,
-                                       Reconstruction* reconstruction,
-                                       ceres::LossFunction* loss_function) {
+                                      Reconstruction* reconstruction,
+                                      ceres::LossFunction* loss_function) {
   Line3D& line3D = reconstruction->Line3D(line3D_id);
 
   // Is 3D line already fully contained in the problem? I.e. its entire track
@@ -728,17 +720,17 @@ void BundleAdjuster::AddLineToProblem(const line3D_t line3D_id,
 #undef CAMERA_MODEL_CASE
     }
     problem_->AddResidualBlock(cost_function, loss_function,
-                               line3D.XYZ1().data(),
-                               line3D.XYZ2().data(), camera.ParamsData());
+                               line3D.XYZ1().data(), line3D.XYZ2().data(),
+                               camera.ParamsData());
     if (track_el.fixed_start) {
       ceres::CostFunction* cost_function = nullptr;
 
       switch (camera.ModelId()) {
-#define CAMERA_MODEL_CASE(CameraModel)                                     \
-  case CameraModel::kModelId:                                              \
-    cost_function =                                                        \
-        LineEndpointConstantPoseBundleAdjustmentCostFunction<CameraModel>::Create( \
-            image.Qvec(), image.Tvec(), line2D.XY1(), track_el.start_parameter);       \
+#define CAMERA_MODEL_CASE(CameraModel)                                    \
+  case CameraModel::kModelId:                                             \
+    cost_function = LineEndpointConstantPoseBundleAdjustmentCostFunction< \
+        CameraModel>::Create(image.Qvec(), image.Tvec(), line2D.XY1(),    \
+                             track_el.start_parameter);                   \
     break;
 
         CAMERA_MODEL_SWITCH_CASES
@@ -768,7 +760,7 @@ void BundleAdjuster::AddLineToProblem(const line3D_t line3D_id,
                                  line3D.XYZ1().data(), line3D.XYZ2().data(),
                                  camera.ParamsData());
     }
-    
+
     ceres::LocalParameterization* plane_parameterization =
         new ceres::AutoDiffLocalParameterization<PlaneParameterizationPlus, 3,
                                                  2>(

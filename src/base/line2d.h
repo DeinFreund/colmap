@@ -39,8 +39,8 @@
 
 namespace colmap {
 
-// 2D Line class corresponds to a line segment in an image. It may or may not have a
-// corresponding 3D line if it is part of a triangulated track.
+// 2D Line class corresponds to a line segment in an image. It may or may not
+// have a corresponding 3D line if it is part of a triangulated track.
 class Line2D {
  public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -55,7 +55,7 @@ class Line2D {
   inline double Y1() const;
   inline double X2() const;
   inline double Y2() const;
-  
+
   inline void SetXY(const Eigen::Vector2d& xy1, const Eigen::Vector2d& xy2);
 
   // The identifier of the observed 3D line. If the image line does not
@@ -77,7 +77,9 @@ class Line2D {
 // Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-const std::pair<Eigen::Vector2d, Eigen::Vector2d> Line2D::XY() const { return std::make_pair(xy1_,xy2_); }
+const std::pair<Eigen::Vector2d, Eigen::Vector2d> Line2D::XY() const {
+  return std::make_pair(xy1_, xy2_);
+}
 
 const Eigen::Vector2d& Line2D::XY1() const { return xy1_; }
 const Eigen::Vector2d& Line2D::XY2() const { return xy2_; }
@@ -87,15 +89,16 @@ double Line2D::Y1() const { return xy1_.y(); }
 double Line2D::X2() const { return xy2_.x(); }
 double Line2D::Y2() const { return xy2_.y(); }
 
-void Line2D::SetXY(const Eigen::Vector2d& xy1, const Eigen::Vector2d& xy2) { xy1_ = xy1; xy2_ = xy2; }
+void Line2D::SetXY(const Eigen::Vector2d& xy1, const Eigen::Vector2d& xy2) {
+  xy1_ = xy1;
+  xy2_ = xy2;
+}
 
 line3D_t Line2D::Line3DId() const { return line3D_id_; }
 
 bool Line2D::HasLine3D() const { return line3D_id_ != kInvalidLine3DId; }
 
-void Line2D::SetLine3DId(const line3D_t line3D_id) {
-  line3D_id_ = line3D_id;
-}
+void Line2D::SetLine3DId(const line3D_t line3D_id) { line3D_id_ = line3D_id; }
 
 }  // namespace colmap
 

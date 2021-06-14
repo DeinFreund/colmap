@@ -206,8 +206,8 @@ class BundleAdjuster {
                          ceres::LossFunction* loss_function);
 
   void AddLineToProblem(const line3D_t line3D_id,
-                         Reconstruction* reconstruction,
-                         ceres::LossFunction* loss_function);
+                        Reconstruction* reconstruction,
+                        ceres::LossFunction* loss_function);
 
  protected:
   void ParameterizeCameras(Reconstruction* reconstruction);

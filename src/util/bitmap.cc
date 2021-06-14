@@ -396,7 +396,7 @@ bool Bitmap::ExifLatitude(double* latitude) const {
     StringTrim(&str);
     StringToLower(&str);
     if (!str.empty() && str[0] == 's') {
-        sign = -1.0;
+      sign = -1.0;
     }
   }
   if (ReadExifTag(FIMD_EXIF_GPS, "GPSLatitude", &str)) {

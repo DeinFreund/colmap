@@ -38,8 +38,7 @@
 namespace colmap {
 namespace mvs {
 
-Workspace::Workspace(const Options& options)
-    : options_(options) {
+Workspace::Workspace(const Options& options) : options_(options) {
   StringToLower(&options_.input_type);
   model_.Read(options_.workspace_path, options_.workspace_format);
   if (options_.max_image_size > 0) {

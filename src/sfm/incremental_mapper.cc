@@ -36,8 +36,8 @@
 
 #include "base/projection.h"
 #include "base/triangulation.h"
-#include "estimators/pose.h"
 #include "estimators/line.h"
+#include "estimators/pose.h"
 #include "util/bitmap.h"
 #include "util/misc.h"
 
@@ -515,7 +515,7 @@ bool IncrementalMapper::RegisterNextImage(const Options& options,
 
   reconstruction_->RegisterImage(image_id);
   RegisterImageEvent(image_id);
-  
+
   for (size_t i = 0; i < inlier_mask.size(); ++i) {
     if (inlier_mask[i]) {
       const point2D_t point2D_idx = tri_corrs[i].first;
@@ -553,8 +553,9 @@ size_t IncrementalMapper::Retriangulate(
     const IncrementalTriangulator::Options& tri_options) {
   CHECK_NOTNULL(reconstruction_);
   for (const auto& image : reconstruction_->Images()) {
-      if (!image.second.IsRegistered()) continue;
-      //triangulator_->TriangulateLines(tri_options, image.first, FindSecondInitialImage(Options{}, image.first, true));      
+    if (!image.second.IsRegistered()) continue;
+    // triangulator_->TriangulateLines(tri_options, image.first,
+    // FindSecondInitialImage(Options{}, image.first, true));
   }
   return triangulator_->Retriangulate(tri_options);
 }
@@ -691,11 +692,13 @@ IncrementalMapper::AdjustLocalBundle(
   filter_image_ids.insert(image_id);
   filter_image_ids.insert(local_bundle.begin(), local_bundle.end());
   report.num_filtered_observations = reconstruction_->FilterPoints3DInImages(
-      options.filter_max_reproj_error, options.filter_min_tri_angle, options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0,
-      filter_image_ids);
+      options.filter_max_reproj_error, options.filter_min_tri_angle,
+      options.line_max_reproj_err_px,
+      options.line_min_tri_angle_deg * M_PI / 180.0, filter_image_ids);
   report.num_filtered_observations += reconstruction_->FilterPoints3D(
-      options.filter_max_reproj_error, options.filter_min_tri_angle,options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0,
-      point3D_ids);
+      options.filter_max_reproj_error, options.filter_min_tri_angle,
+      options.line_max_reproj_err_px,
+      options.line_min_tri_angle_deg * M_PI / 180.0, point3D_ids);
 
   return report;
 }
@@ -738,10 +741,11 @@ bool IncrementalMapper::AdjustGlobalBundle(
   std::map<line3D_t, double> line_lengths;
   std::map<line3D_t, Eigen::Vector3d> line_dir;
   for (const auto& line : reconstruction_->Lines3D()) {
-      line_lengths[line.first] = line.second.Length();
-      line_dir[line.first] = (line.second.XYZ2() -line.second.XYZ1()).normalized();
+    line_lengths[line.first] = line.second.Length();
+    line_dir[line.first] =
+        (line.second.XYZ2() - line.second.XYZ1()).normalized();
   }
-  
+
   // Run bundle adjustment.
   BundleAdjuster bundle_adjuster(ba_options, ba_config);
   if (!bundle_adjuster.Solve(reconstruction_)) {
@@ -749,9 +753,12 @@ bool IncrementalMapper::AdjustGlobalBundle(
   }
 
   for (const auto& line : reconstruction_->Lines3D()) {
-      CHECK_LT(std::abs(line_lengths[line.first] - (line.second.XYZ2() -line.second.XYZ1()).dot(line_dir[line.first])), 1e-3);
+    CHECK_LT(std::abs(line_lengths[line.first] -
+                      (line.second.XYZ2() - line.second.XYZ1())
+                          .dot(line_dir[line.first])),
+             1e-3);
   }
-  
+
   // Normalize scene for numerical stability and
   // to avoid large scale changes in viewer.
   reconstruction_->Normalize();
@@ -785,7 +792,6 @@ bool IncrementalMapper::AdjustParallelGlobalBundle(
     return false;
   }
 
-  
   // Normalize scene for numerical stability and
   // to avoid large scale changes in viewer.
   reconstruction_->Normalize();
@@ -820,9 +826,11 @@ size_t IncrementalMapper::FilterImages(const Options& options) {
 size_t IncrementalMapper::FilterPoints(const Options& options) {
   CHECK_NOTNULL(reconstruction_);
   CHECK(options.Check());
-  size_t filtered_points = reconstruction_->FilterAllPoints3D(options.filter_max_reproj_error,
-                                            options.filter_min_tri_angle,options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0);
-  
+  size_t filtered_points = reconstruction_->FilterAllPoints3D(
+      options.filter_max_reproj_error, options.filter_min_tri_angle,
+      options.line_max_reproj_err_px,
+      options.line_min_tri_angle_deg * M_PI / 180.0);
+
   reconstruction_->RecalculateLineEndpoints();
   return filtered_points;
 }
@@ -927,7 +935,8 @@ std::vector<image_t> IncrementalMapper::FindFirstInitialImage(
 }
 
 std::vector<image_t> IncrementalMapper::FindSecondInitialImage(
-    const Options& options, const image_t image_id1, bool ignore_registrations) const {
+    const Options& options, const image_t image_id1,
+    bool ignore_registrations) const {
   const CorrespondenceGraph& correspondence_graph =
       database_cache_->CorrespondenceGraph();
 

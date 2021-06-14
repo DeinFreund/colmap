@@ -322,8 +322,9 @@ int RunPointFiltering(int argc, char** argv) {
   Reconstruction reconstruction;
   reconstruction.Read(input_path);
 
-  size_t num_filtered =
-  reconstruction.FilterAllPoints3D(max_reproj_error, min_tri_angle, line_max_reproj_err_px, line_min_tri_angle_deg * M_PI / 180.0);
+  size_t num_filtered = reconstruction.FilterAllPoints3D(
+      max_reproj_error, min_tri_angle, line_max_reproj_err_px,
+      line_min_tri_angle_deg * M_PI / 180.0);
 
   for (const auto point3D_id : reconstruction.Point3DIds()) {
     const auto& point3D = reconstruction.Point3D(point3D_id);

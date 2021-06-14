@@ -42,14 +42,14 @@
 #include "base/camera.h"
 #include "base/database.h"
 #include "base/image.h"
-#include "base/point2d.h"
-#include "base/point3d.h"
 #include "base/line2d.h"
 #include "base/line3d.h"
+#include "base/point2d.h"
+#include "base/point3d.h"
 #include "base/similarity_transform.h"
 #include "base/track.h"
-#include "estimators/similarity_transform.h"
 #include "estimators/line.h"
+#include "estimators/similarity_transform.h"
 #include "optim/loransac.h"
 #include "util/alignment.h"
 #include "util/types.h"
@@ -154,7 +154,7 @@ class Reconstruction {
 
   // Add observation to existing 3D line.
   void AddLineObservation(const line3D_t line3D_id, const image_t image_id,
-                      const line2D_t line2D_idx);
+                          const line2D_t line2D_idx);
 
   // Merge two 3D points and return new identifier of new 3D point.
   // The location of the merged 3D point is a weighted average of the two
@@ -165,8 +165,7 @@ class Reconstruction {
   // Merge two 3D lines and return new identifier of new 3D line.
   // The location of the merged 3D line is a weighted average of the two
   // original 3D line's locations according to their track lengths.
-  line3D_t MergeLines3D(const line3D_t line3D_id1,
-                          const line3D_t line3D_id2);
+  line3D_t MergeLines3D(const line3D_t line3D_id1, const line3D_t line3D_id2);
 
   // Delete a 3D point, and all its references in the observed images.
   void DeletePoint3D(const point3D_t point3D_id);
@@ -437,7 +436,8 @@ class Reconstruction {
       const double max_reproj_error,
       const std::unordered_set<point3D_t>& point3D_ids);
 
-  size_t FilterLines3DWithLargeReprojectionError(double max_reproj_error, double min_tri_angle);
+  size_t FilterLines3DWithLargeReprojectionError(double max_reproj_error,
+                                                 double min_tri_angle);
 
   std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>
   ComputeBoundsAndCentroid(const double p0, const double p1,
@@ -479,7 +479,7 @@ class Reconstruction {
 
   // Total number of added 3D points, used to generate unique identifiers.
   point3D_t num_added_points3D_;
-    
+
   // Total number of added 3D lines, used to generate unique identifiers.
   point3D_t num_added_lines3D_;
 };

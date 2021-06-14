@@ -286,8 +286,9 @@ void ModelViewerWidget::ReloadReconstruction() {
   }
 
   statusbar_status_label->setText(QString().sprintf(
-      "%d Images - %d Points - %d Lines", static_cast<int>(reg_image_ids.size()),
-      static_cast<int>(points3D.size()), static_cast<int>(lines3D.size())));
+      "%d Images - %d Points - %d Lines",
+      static_cast<int>(reg_image_ids.size()), static_cast<int>(points3D.size()),
+      static_cast<int>(lines3D.size())));
 
   Upload();
 }

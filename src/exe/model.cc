@@ -118,23 +118,12 @@ int RunModelAligner(int argc, char** argv) {
   std::vector<std::string> ref_image_names;
   std::vector<Eigen::Vector3d> ref_locations;
   std::vector<std::string> lines = ReadTextFileLines(ref_images_path);
-  int linei = 0;
   for (const auto& line : lines) {
     std::stringstream line_parser(line);
-    std::string first;
-    line_parser >> first;
-    if (first == "#") continue;
-    if (linei++ % 2 == 1) continue;
-    
     std::string image_name = "";
     Eigen::Vector3d camera_position;
-    Eigen::Vector3d vec;
-    Eigen::Vector4d quat;
-    line_parser >> quat[0] >> quat[1] >> quat[2] >> quat[3]  >> vec[0] >> vec[1] >> vec[2] >> first >> image_name;
-    camera_position = ProjectionCenterFromPose(quat, vec);
-    // TODO undo
-    //line_parser >> image_name >> camera_position[0] >> camera_position[1] >>
-    //    camera_position[2];
+    line_parser >> image_name >> camera_position[0] >> camera_position[1] >>
+        camera_position[2];
     ref_image_names.push_back(image_name);
     ref_locations.push_back(camera_position);
   }
@@ -363,7 +352,6 @@ int RunModelMerger(int argc, char** argv) {
   std::string input_path2;
   std::string output_path;
   double max_reproj_error = 64.0;
-  double max_line_reproj_error = 64.0;
 
   OptionManager options;
   options.AddRequiredOption("input_path1", &input_path1);
@@ -389,7 +377,7 @@ int RunModelMerger(int argc, char** argv) {
             << std::endl;
 
   PrintHeading2("Merging reconstructions");
-  if (reconstruction1.Merge(reconstruction2, max_reproj_error, max_line_reproj_error)) {
+  if (reconstruction1.Merge(reconstruction2, max_reproj_error)) {
     std::cout << "=> Merge succeeded" << std::endl;
     PrintHeading2("Merged reconstruction");
     std::cout << StringPrintf("Images: %d", reconstruction1.NumRegImages())

@@ -101,7 +101,7 @@ struct PlaneParameterizationPlus {
     return true;
   }
 
-    const Eigen::Vector3d normal_;
+  const Eigen::Vector3d normal_;
 };
 
 // Line endpoint bundle adjustment cost function for variable
@@ -244,8 +244,7 @@ class LineBundleAdjustmentCostFunction {
       : observed_x1_(start.x()),
         observed_y1_(start.y()),
         observed_x2_(end.x()),
-        observed_y2_(end.y()) {
-  }
+        observed_y2_(end.y()) {}
 
   static ceres::CostFunction* Create(const Eigen::Vector2d& start,
                                      const Eigen::Vector2d& end) {
@@ -292,28 +291,36 @@ class LineBundleAdjustmentCostFunction {
                               &point2D2[0], &point2D2[1]);
 
     // Distance from line
-    //std::cerr << observed_x2_ - observed_x1_ << " " << observed_y2_ - observed_y1_  << "\n";
-    //std::cerr << point2D1[0] - T(observed_x1_) << " " << point2D1[1] - T(observed_y1_)  << "\n"; 
-    const T div = T(1) / (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) + T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
-    const T proj1 = (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) + T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) * div;
-    residuals[0] = point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
-    residuals[1] = point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
-    const T proj2 = ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) + (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) * div;
-    residuals[2] = point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
-    residuals[3] = point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
-    //std::cerr << "residuals: " << residuals[0] << " "  << residuals[1] << " "  << residuals[2] << " "  << residuals[3] << " \n"; 
+    const T div =
+        T(1) /
+        (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) +
+         T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
+    const T proj1 =
+        (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) +
+         T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) *
+        div;
+    residuals[0] =
+        point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
+    residuals[1] =
+        point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
+    const T proj2 =
+        ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) +
+         (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) *
+        div;
+    residuals[2] =
+        point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
+    residuals[3] =
+        point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
 
     return true;
   }
 
  private:
-    
   const double observed_x1_;
   const double observed_y1_;
   const double observed_x2_;
   const double observed_y2_;
 };
-
 
 // Bundle adjustment cost function for variable
 // camera calibration and point parameters, and fixed camera pose.
@@ -321,7 +328,7 @@ template <typename CameraModel>
 class LineBundleAdjustmentConstantPoseCostFunction {
  public:
   LineBundleAdjustmentConstantPoseCostFunction(const Eigen::Vector4d& qvec,
-                                           const Eigen::Vector3d& tvec,
+                                               const Eigen::Vector3d& tvec,
                                                const Eigen::Vector2d& start,
                                                const Eigen::Vector2d& end)
       : qw_(qvec(0)),
@@ -343,15 +350,16 @@ class LineBundleAdjustmentConstantPoseCostFunction {
     return (new ceres::AutoDiffCostFunction<
             LineBundleAdjustmentConstantPoseCostFunction<CameraModel>, 4, 3, 3,
             CameraModel::kNumParams>(
-                new LineBundleAdjustmentConstantPoseCostFunction(qvec, tvec, start, end)));
+        new LineBundleAdjustmentConstantPoseCostFunction(qvec, tvec, start,
+                                                         end)));
   }
 
   template <typename T>
-  bool operator()(const T* const point3D1, const T* const point3D2, const T* const camera_params,
-                  T* residuals) const {
+  bool operator()(const T* const point3D1, const T* const point3D2,
+                  const T* const camera_params, T* residuals) const {
     const T qvec[4] = {T(qw_), T(qx_), T(qy_), T(qz_)};
     const T tvec[3] = {T(tx_), T(ty_), T(tz_)};
-    
+
     T point2D1[2];
     T point2D2[2];
     T projection[3];
@@ -385,14 +393,27 @@ class LineBundleAdjustmentConstantPoseCostFunction {
                               &point2D2[0], &point2D2[1]);
 
     // Distance from line
-    const T div = T(1) / (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) + T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
-    const T proj1 = (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) + T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) * div;
-    residuals[0] = point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
-    residuals[1] = point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
-    const T proj2 = ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) + (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) * div;
-    residuals[2] = point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
-    residuals[3] = point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
-    
+    const T div =
+        T(1) /
+        (T(observed_x2_ - observed_x1_) * T(observed_x2_ - observed_x1_) +
+         T(observed_y2_ - observed_y1_) * T(observed_y2_ - observed_y1_));
+    const T proj1 =
+        (T(observed_x2_ - observed_x1_) * (point2D1[0] - T(observed_x1_)) +
+         T(observed_y2_ - observed_y1_) * (point2D1[1] - T(observed_y1_))) *
+        div;
+    residuals[0] =
+        point2D1[0] - T(observed_x1_) - proj1 * T(observed_x2_ - observed_x1_);
+    residuals[1] =
+        point2D1[1] - T(observed_y1_) - proj1 * T(observed_y2_ - observed_y1_);
+    const T proj2 =
+        ((T(observed_x2_ - observed_x1_)) * (point2D2[0] - T(observed_x1_)) +
+         (T(observed_y2_ - observed_y1_)) * (point2D2[1] - T(observed_y1_))) *
+        div;
+    residuals[2] =
+        point2D2[0] - T(observed_x1_) - proj2 * T(observed_x2_ - observed_x1_);
+    residuals[3] =
+        point2D2[1] - T(observed_y1_) - proj2 * T(observed_y2_ - observed_y1_);
+
     return true;
   }
 
@@ -409,7 +430,6 @@ class LineBundleAdjustmentConstantPoseCostFunction {
   const double observed_x2_;
   const double observed_y2_;
 };
-
 
 // Bundle adjustment cost function for variable
 // camera calibration and point parameters, and fixed camera pose.

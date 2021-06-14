@@ -185,8 +185,9 @@ class IncrementalMapper {
                           const image_t image_id);
 
   // Triangulate line observations of image.
-  size_t TriangulateImageLines(const IncrementalTriangulator::Options& tri_options,
-                          const image_t image_id);
+  size_t TriangulateImageLines(
+      const IncrementalTriangulator::Options& tri_options,
+      const image_t image_id);
 
   // Retriangulate image pairs that should have common observations according to
   // the scene graph but don't due to drift, etc. To handle drift, the employed
@@ -214,7 +215,8 @@ class IncrementalMapper {
   LocalBundleAdjustmentReport AdjustLocalBundle(
       const Options& options, const BundleAdjustmentOptions& ba_options,
       const IncrementalTriangulator::Options& tri_options,
-      const image_t image_id, const std::unordered_set<point3D_t>& point3D_ids, const std::unordered_set<line3D_t>& line3D_ids);
+      const image_t image_id, const std::unordered_set<point3D_t>& point3D_ids,
+      const std::unordered_set<line3D_t>& line3D_ids);
 
   // Global bundle adjustment using Ceres Solver or PBA.
   bool AdjustGlobalBundle(const Options& options,
@@ -258,8 +260,9 @@ class IncrementalMapper {
   // first image. Suitable second images have a large number of correspondences
   // to the first image and have camera calibration priors. The returned list is
   // ordered such that most suitable images are in the front.
-  std::vector<image_t> FindSecondInitialImage(const Options& options,
-                                              const image_t image_id1, bool ignore_registrations = false) const;
+  std::vector<image_t> FindSecondInitialImage(
+      const Options& options, const image_t image_id1,
+      bool ignore_registrations = false) const;
 
   // Find local bundle for given image in the reconstruction. The local bundle
   // is defined as the images that are most connected, i.e. maximum number of
@@ -322,7 +325,6 @@ class IncrementalMapper {
   // This image list will be non-empty, if the reconstruction is continued from
   // an existing reconstruction.
   std::unordered_set<image_t> existing_image_ids_;
-
 };
 
 }  // namespace colmap

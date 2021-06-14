@@ -34,10 +34,10 @@
 #include <numeric>
 
 #include "SiftGPU/SiftGPU.h"
+#include "base/line.h"
 #include "feature/sift.h"
 #include "util/cuda.h"
 #include "util/misc.h"
-#include "base/line.h"
 
 extern "C" {
 #include "LSD/lsd.h"
@@ -428,18 +428,18 @@ void SiftFeatureExtractorThread::Run() {
         }
 
         if (success) {
-            ScaleKeypoints(image_data.bitmap, image_data.camera,
-                           &image_data.keypoints);
-            if (camera_mask_) {
-                MaskKeypoints(*camera_mask_, &image_data.keypoints,
-                              &image_data.descriptors);
-            }
-            if (image_data.mask.Data()) {
-                MaskKeypoints(image_data.mask, &image_data.keypoints,
-                              &image_data.descriptors);
-            }
+          ScaleKeypoints(image_data.bitmap, image_data.camera,
+                         &image_data.keypoints);
+          if (camera_mask_) {
+            MaskKeypoints(*camera_mask_, &image_data.keypoints,
+                          &image_data.descriptors);
+          }
+          if (image_data.mask.Data()) {
+            MaskKeypoints(image_data.mask, &image_data.keypoints,
+                          &image_data.descriptors);
+          }
         } else {
-            image_data.status = ImageReader::Status::FAILURE;
+          image_data.status = ImageReader::Status::FAILURE;
         }
       }
 

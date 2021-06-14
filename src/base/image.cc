@@ -56,8 +56,7 @@ Image::Image()
       qvec_(1.0, 0.0, 0.0, 0.0),
       tvec_(0.0, 0.0, 0.0),
       qvec_prior_(kNaN, kNaN, kNaN, kNaN),
-      tvec_prior_(kNaN, kNaN, kNaN) {
-}
+      tvec_prior_(kNaN, kNaN, kNaN) {}
 
 void Image::SetUp(const class Camera& camera) {
   CHECK_EQ(camera_id_, camera.CameraId());
@@ -83,7 +82,7 @@ void Image::SetLines2D(const std::vector<class Line2D>& lines) {
 }
 
 void Image::SetLine3DForLine2D(const line2D_t line2D_idx,
-                                 const line3D_t line3D_id) {
+                               const line3D_t line3D_id) {
   CHECK_NE(line3D_id, kInvalidLine3DId);
   class Line2D& line2D = lines2D_.at(line2D_idx);
   if (!line2D.HasLine3D()) {

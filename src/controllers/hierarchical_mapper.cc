@@ -61,7 +61,8 @@ void MergeClusters(
       for (size_t j = 0; j < i; ++j) {
         const double kMaxReprojError = 8.0;
         const double kMaxReprojErrorLines = 8.0;
-        if (reconstructions[i]->Merge(*reconstructions[j], kMaxReprojError, kMaxReprojErrorLines)) {
+        if (reconstructions[i]->Merge(*reconstructions[j], kMaxReprojError,
+                                      kMaxReprojErrorLines)) {
           reconstructions.erase(reconstructions.begin() + j);
           merge_success = true;
           break;

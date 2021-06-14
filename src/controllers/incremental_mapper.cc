@@ -47,7 +47,7 @@ size_t TriangulateImage(const IncrementalMapperOptions& options,
 }
 
 size_t TriangulateImageLines(const IncrementalMapperOptions& options,
-                        const Image& image, IncrementalMapper* mapper) {
+                             const Image& image, IncrementalMapper* mapper) {
   std::cout << "  => Continued line observations: " << image.NumLines3D()
             << std::endl;
   const size_t num_tris =
@@ -55,7 +55,6 @@ size_t TriangulateImageLines(const IncrementalMapperOptions& options,
   std::cout << "  => Added line observations: " << num_tris << std::endl;
   return num_tris;
 }
-
 
 void AdjustGlobalBundle(const IncrementalMapperOptions& options,
                         IncrementalMapper* mapper) {
@@ -92,8 +91,7 @@ void IterativeLocalRefinement(const IncrementalMapperOptions& options,
   for (int i = 0; i < options.ba_local_max_refinements; ++i) {
     const auto report = mapper->AdjustLocalBundle(
         options.Mapper(), ba_options, options.Triangulation(), image_id,
-        mapper->GetModifiedPoints3D(),
-        mapper->GetModifiedLines3D());
+        mapper->GetModifiedPoints3D(), mapper->GetModifiedLines3D());
     std::cout << "  => Merged observations: " << report.num_merged_observations
               << std::endl;
     std::cout << "  => Completed observations: "
@@ -553,10 +551,10 @@ void IncrementalMapperController::Reconstruct(
               reconstruction.NumPoints3D() >=
                   options_->ba_global_points_freq + ba_prev_num_points) {
             IterativeGlobalRefinement(*options_, &mapper);
-            
+
             for (image_t image_id : pending_line_tri_image_ids) {
-                const Image& image = reconstruction.Image(image_id);
-                TriangulateImageLines(*options_, image, &mapper);
+              const Image& image = reconstruction.Image(image_id);
+              TriangulateImageLines(*options_, image, &mapper);
             }
             pending_line_tri_image_ids.clear();
             IterativeGlobalRefinement(*options_, &mapper);
@@ -622,21 +620,21 @@ void IncrementalMapperController::Reconstruct(
     if (reconstruction.NumRegImages() >= 2 /*&&
         reconstruction.NumRegImages() != ba_prev_num_reg_images &&
           reconstruction.NumPoints3D() != ba_prev_num_points*/) {
-        IterativeGlobalRefinement(*options_, &mapper);
-        /*
-        for (image_t image_id : pending_line_tri_image_ids) {
-            const Image& image = reconstruction.Image(image_id);
-            TriangulateImageLines(*options_, image, &mapper);
-        }
-        pending_line_tri_image_ids.clear();
-        */
-        for (image_t image_id : reconstruction.RegImageIds()) {
-            const Image& image = reconstruction.Image(image_id);
-            TriangulateImageLines(*options_, image, &mapper);
-        }
-        IterativeGlobalRefinement(*options_, &mapper);
+      IterativeGlobalRefinement(*options_, &mapper);
+      /*
+      for (image_t image_id : pending_line_tri_image_ids) {
+          const Image& image = reconstruction.Image(image_id);
+          TriangulateImageLines(*options_, image, &mapper);
+      }
+      pending_line_tri_image_ids.clear();
+      */
+      for (image_t image_id : reconstruction.RegImageIds()) {
+        const Image& image = reconstruction.Image(image_id);
+        TriangulateImageLines(*options_, image, &mapper);
+      }
+      IterativeGlobalRefinement(*options_, &mapper);
     }
-    FilterPoints(*options_, &mapper); //extra step
+    FilterPoints(*options_, &mapper);  // extra step
 
     // If the total number of images is small then do not enforce the minimum
     // model size so that we can reconstruct small image collections.
