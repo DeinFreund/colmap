@@ -323,6 +323,9 @@ class Reconstruction {
   // Convert 3D points in reconstruction to PLY point cloud.
   std::vector<PlyPoint> ConvertToPLY() const;
 
+  // Convert 3D lines in reconstruction to PLY point cloud.
+  std::vector<PlyPoint> ConvertLineEndpointsToPLY() const;
+
   // Import from other data formats. Note that these import functions are
   // only intended for visualization of data and usable for reconstruction.
   void ImportPLY(const std::string& path);
@@ -396,6 +399,9 @@ class Reconstruction {
 
   // Exports 3D points only in PLY format.
   void ExportPLY(const std::string& path) const;
+
+  // Exports 3D points only in PLY format.
+  void ExportLinesEndpointsPLY(const std::string& path) const;
 
   // Exports in VRML format https://en.wikipedia.org/wiki/VRML.
   void ExportVRML(const std::string& images_path,
@@ -666,6 +672,7 @@ bool Reconstruction::AlignRobust(const std::vector<std::string>& image_names,
   for (size_t i = 0; i < image_names.size(); ++i) {
     const class Image* image = FindImageWithName(image_names[i]);
     if (image == nullptr) {
+      std::cerr << "No image with name " << image_names[i] << "\n";
       continue;
     }
 

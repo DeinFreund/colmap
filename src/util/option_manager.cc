@@ -589,6 +589,10 @@ void OptionManager::AddMapperOptions() {
                               &mapper->triangulation.line_max_construct_reproj_error_px);
   AddAndRegisterDefaultOption("Mapper.tri_line_max_match_reproj_error_px",
                               &mapper->triangulation.line_max_match_reproj_error_px);
+  AddAndRegisterDefaultOption("Mapper.tri_line_min_tri_angle_deg",
+                              &mapper->triangulation.line_min_tri_angle_deg);
+  AddAndRegisterDefaultOption("Mapper.tri_max_line_candidate_images",
+                              &mapper->triangulation.max_line_candidate_images);
   AddAndRegisterDefaultOption("Mapper.tri_complete_max_transitivity",
                               &mapper->triangulation.complete_max_transitivity);
   AddAndRegisterDefaultOption("Mapper.tri_re_max_angle_error",

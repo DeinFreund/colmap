@@ -636,7 +636,6 @@ void IncrementalMapperController::Reconstruct(
         }
         IterativeGlobalRefinement(*options_, &mapper);
     }
-    std::cerr << "Filter time\n";
     FilterPoints(*options_, &mapper); //extra step
 
     // If the total number of images is small then do not enforce the minimum

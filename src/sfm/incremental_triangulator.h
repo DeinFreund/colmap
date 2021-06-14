@@ -64,6 +64,12 @@ class IncrementalTriangulator {
     // Maximum reprojection error to match lines.
     double line_max_match_reproj_error_px = 4.0;
 
+    // Minimum pairwise triangulation angle for a stable line triangulation.
+    double line_min_tri_angle_deg = 20.0;
+
+    // Maximum number of images to consider for line matching
+    int max_line_candidate_images = 15;
+
     // Maximum transitivity for track completion.
     int complete_max_transitivity = 5;
 
@@ -110,7 +116,7 @@ class IncrementalTriangulator {
   // Match an image with existing 3d lines
   size_t MatchLines(const Options& options, const image_t image_id);
 
-  // Triangulate lines between pairs of images. 
+  // Triangulate lines between pairs of images.
   size_t TriangulateLines(const Options& options, const image_t image_id,
                           std::vector<image_t> candidates);
 
@@ -157,7 +163,6 @@ class IncrementalTriangulator {
   // Clear the collection of changed 3D points.
   void ClearModifiedPoints3D();
 
-
   // Indicate that a 3D line has been modified.
   void AddModifiedLine3D(const line3D_t line3D_id);
 
@@ -166,7 +171,7 @@ class IncrementalTriangulator {
 
   // Clear the collection of changed 3D lines.
   void ClearModifiedLines3D();
-    
+
   // Data for a correspondence / element of a track, used to store all
   // relevant data for triangulation, in order to avoid duplicate lookup
   // in the underlying unordered_map's in the Reconstruction
@@ -224,7 +229,7 @@ class IncrementalTriangulator {
   // Changed 3D points, i.e. if a 3D point is modified (created, continued,
   // deleted, merged, etc.). Cleared once `ModifiedPoints3D` is called.
   std::unordered_set<point3D_t> modified_point3D_ids_;
-    
+
   // Changed 3D lines, i.e. if a 3D line is modified (created, continued,
   // deleted, merged, etc.). Cleared once `ModifiedLines3D` is called.
   std::unordered_set<line3D_t> modified_line3D_ids_;

@@ -833,6 +833,7 @@ void MainWindow::ExportAs() {
           reconstruction.ExportBundler(export_path, export_path + ".list.txt");
         } else if (filter == "PLY (*.ply)") {
           reconstruction.ExportPLY(export_path);
+          reconstruction.ExportLinesEndpointsPLY(export_path + "_lines.ply");
         } else if (filter == "VRML (*.wrl)") {
           const auto base_path =
               export_path.substr(0, export_path.find_last_of("."));

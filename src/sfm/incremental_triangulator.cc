@@ -136,8 +136,9 @@ size_t IncrementalTriangulator::TriangulateLines(
   if (candidates.size() >= 2) {
     std::vector<Line3D> candidate_lines;
 
-    for (size_t cand2_idx = 0; cand2_idx < candidates.size() - 1; cand2_idx++) {
-      for (size_t cand3_idx = cand2_idx + 1; cand3_idx < candidates.size() - 1;
+    const size_t num_candidates = std::min(static_cast<size_t>(options.max_line_candidate_images), candidates.size());
+    for (size_t cand2_idx = 0; cand2_idx < num_candidates - 1; cand2_idx++) {
+      for (size_t cand3_idx = cand2_idx + 1; cand3_idx < num_candidates;
            cand3_idx++) {
         const Image& second_image =
             reconstruction_->Image(candidates[cand2_idx]);
@@ -222,25 +223,26 @@ size_t IncrementalTriangulator::TriangulateLines(
              std::map<std::pair<size_t, double>, std::reference_wrapper<Line3D>>>
         track_candidates;
 
-    const double min_tri_angle = 30 * M_PI / 180.0;
+    const double min_tri_angle = options.line_min_tri_angle_deg * M_PI / 180.0;
     const auto is_outlier = [&](const Line3D& line3D) {
       return line3D.Track().Length() < 4 ||
-                                       LineTriangulationAngle(line3D, *reconstruction_) < min_tri_angle;
+             LineTriangulationAngle(line3D, *reconstruction_) < min_tri_angle;
     };
     candidate_lines.erase(std::remove_if(candidate_lines.begin(),
                                          candidate_lines.end(), is_outlier),
                           candidate_lines.end());
-    
+
     for (Line3D& line3D : candidate_lines) {
       for (const auto& el : line3D.Track().Elements()) {
-        auto pair = track_candidates[std::make_pair(el.image_id, el.line2D_idx)].emplace(
-            std::make_pair(-line3D.Track().Length(), line3D.Error()), line3D);
-        std::cout << "emplaced for " << &line3D << ": " << el.image_id << ", " << el.line2D_idx << std::endl;
+        auto pair = track_candidates[std::make_pair(el.image_id, el.line2D_idx)]
+                        .emplace(std::make_pair(-line3D.Track().Length(),
+                                                line3D.Error()),
+                                 line3D);
 
         CHECK(pair.second);
       }
     }
-    
+
     for (auto& candidate_pair : track_candidates) {
       image_t image_id = candidate_pair.first.first;
       line2D_t line2D_idx = candidate_pair.first.second;

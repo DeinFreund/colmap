@@ -969,6 +969,33 @@ std::vector<PlyPoint> Reconstruction::ConvertToPLY() const {
   return ply_points;
 }
 
+
+std::vector<PlyPoint> Reconstruction::ConvertLineEndpointsToPLY() const {
+  std::vector<PlyPoint> ply_points;
+  ply_points.reserve(2 * lines3D_.size());
+
+  for (const auto& line3D : lines3D_) {
+    PlyPoint ply_point;
+    ply_point.x = line3D.second.XYZ1().x();
+    ply_point.y = line3D.second.XYZ1().y();
+    ply_point.z = line3D.second.XYZ1().z();
+    ply_point.r = line3D.second.Color(0);
+    ply_point.g = line3D.second.Color(1);
+    ply_point.b = line3D.second.Color(2);
+    ply_points.push_back(ply_point);
+    ply_point.x = line3D.second.XYZ2().x();
+    ply_point.y = line3D.second.XYZ2().y();
+    ply_point.z = line3D.second.XYZ2().z();
+    ply_point.r = line3D.second.Color(0);
+    ply_point.g = line3D.second.Color(1);
+    ply_point.b = line3D.second.Color(2);
+    ply_points.push_back(ply_point);
+  }
+
+  return ply_points;
+}
+
+
 void Reconstruction::ImportPLY(const std::string& path) {
   points3D_.clear();
 
@@ -1339,6 +1366,14 @@ bool Reconstruction::ExportBundler(const std::string& path,
 
 void Reconstruction::ExportPLY(const std::string& path) const {
   const auto ply_points = ConvertToPLY();
+
+  const bool kWriteNormal = false;
+  const bool kWriteRGB = true;
+  WriteBinaryPlyPoints(path, ply_points, kWriteNormal, kWriteRGB);
+}
+
+void Reconstruction::ExportLinesEndpointsPLY(const std::string& path) const {
+  const auto ply_points = ConvertLineEndpointsToPLY();
 
   const bool kWriteNormal = false;
   const bool kWriteRGB = true;

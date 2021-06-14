@@ -752,7 +752,6 @@ bool IncrementalMapper::AdjustGlobalBundle(
       CHECK_LT(std::abs(line_lengths[line.first] - (line.second.XYZ2() -line.second.XYZ1()).dot(line_dir[line.first])), 1e-3);
   }
   
-  reconstruction_->RecalculateLineEndpoints();
   // Normalize scene for numerical stability and
   // to avoid large scale changes in viewer.
   reconstruction_->Normalize();
@@ -787,7 +786,6 @@ bool IncrementalMapper::AdjustParallelGlobalBundle(
   }
 
   
-  reconstruction_->RecalculateLineEndpoints();
   // Normalize scene for numerical stability and
   // to avoid large scale changes in viewer.
   reconstruction_->Normalize();
@@ -822,8 +820,11 @@ size_t IncrementalMapper::FilterImages(const Options& options) {
 size_t IncrementalMapper::FilterPoints(const Options& options) {
   CHECK_NOTNULL(reconstruction_);
   CHECK(options.Check());
-  return reconstruction_->FilterAllPoints3D(options.filter_max_reproj_error,
+  size_t filtered_points = reconstruction_->FilterAllPoints3D(options.filter_max_reproj_error,
                                             options.filter_min_tri_angle,options.line_max_reproj_err_px, options.line_min_tri_angle_deg * M_PI / 180.0);
+  
+  reconstruction_->RecalculateLineEndpoints();
+  return filtered_points;
 }
 
 const Reconstruction& IncrementalMapper::GetReconstruction() const {

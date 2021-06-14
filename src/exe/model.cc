@@ -118,12 +118,23 @@ int RunModelAligner(int argc, char** argv) {
   std::vector<std::string> ref_image_names;
   std::vector<Eigen::Vector3d> ref_locations;
   std::vector<std::string> lines = ReadTextFileLines(ref_images_path);
+  int linei = 0;
   for (const auto& line : lines) {
     std::stringstream line_parser(line);
+    std::string first;
+    line_parser >> first;
+    if (first == "#") continue;
+    if (linei++ % 2 == 1) continue;
+    
     std::string image_name = "";
     Eigen::Vector3d camera_position;
-    line_parser >> image_name >> camera_position[0] >> camera_position[1] >>
-        camera_position[2];
+    Eigen::Vector3d vec;
+    Eigen::Vector4d quat;
+    line_parser >> quat[0] >> quat[1] >> quat[2] >> quat[3]  >> vec[0] >> vec[1] >> vec[2] >> first >> image_name;
+    camera_position = ProjectionCenterFromPose(quat, vec);
+    // TODO undo
+    //line_parser >> image_name >> camera_position[0] >> camera_position[1] >>
+    //    camera_position[2];
     ref_image_names.push_back(image_name);
     ref_locations.push_back(camera_position);
   }
